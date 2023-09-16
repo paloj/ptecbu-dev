@@ -1,0 +1,15 @@
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\Launcher.exe
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\Launcher.deps.json
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\Launcher.runtimeconfig.json
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\Launcher.dll
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\Launcher.pdb
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.csproj.AssemblyReference.cache
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.GeneratedMSBuildEditorConfig.editorconfig
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.AssemblyInfoInputs.cache
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.AssemblyInfo.cs
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.csproj.CoreCompileInputs.cache
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.dll
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\refint\Launcher.dll
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.pdb
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\Launcher.genruntimeconfig.cache
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\obj\Release\net7.0\win10-x64\ref\Launcher.dll

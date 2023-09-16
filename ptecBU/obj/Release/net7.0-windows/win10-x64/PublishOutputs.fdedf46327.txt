@@ -1,0 +1,16 @@
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.exe
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\config.ini
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Resources\black.ico
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Resources\green.ico
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Resources\red.ico
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Resources\white.ico
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Resources\yellow.ico
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Launcher\Launcher.deps.json
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Launcher\Launcher.dll
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Launcher\Launcher.exe
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Launcher\Launcher.pdb
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Launcher\Launcher.runtimeconfig.json
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.dll
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.deps.json
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.runtimeconfig.json
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.pdb

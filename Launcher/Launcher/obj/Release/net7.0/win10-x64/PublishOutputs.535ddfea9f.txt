@@ -1,0 +1,5 @@
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\publish\Launcher.exe
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\publish\Launcher.dll
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\publish\Launcher.deps.json
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\publish\Launcher.runtimeconfig.json
+V:\ptecBU\dev\ptecBU\Launcher\Launcher\bin\Release\net7.0\win10-x64\publish\Launcher.pdb
