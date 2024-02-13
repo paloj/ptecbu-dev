@@ -7,7 +7,7 @@
   "targets": {
     ".NETCoreApp,Version=v7.0": {},
     ".NETCoreApp,Version=v7.0/win10-x64": {
-      "ptecBU/1.0.0.15": {
+      "ptecBU/1.0.0.16": {
         "runtime": {
           "ptecBU.dll": {}
         }
@@ -15,7 +15,7 @@
     }
   },
   "libraries": {
-    "ptecBU/1.0.0.15": {
+    "ptecBU/1.0.0.16": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
