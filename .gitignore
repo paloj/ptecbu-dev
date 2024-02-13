@@ -1,7 +1,8 @@
 ptecBU/bin
 ptecBU/obj
-Launcher/bin
-Launcher/obj
+Launcher/Launcher/bin
+Launcher/Launcher/obj
 updater/bin
 updater/obj
 inno setup/*.exe
+
