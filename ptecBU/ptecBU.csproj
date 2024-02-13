@@ -40,7 +40,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Launcher\Launcher\bin\Release\net7.0-windows\win10-x64\publish\**">
+    <None Include="..\Launcher\Launcher\bin\Release\net7.0-windows\win-x64\publish\**">
       <Link>Launcher\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
