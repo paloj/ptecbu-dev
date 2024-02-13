@@ -1,187 +1,1 @@
-
--------------------------------------------------------------------------------
-   ROBOCOPY     ::     Robust File Copy for Windows                              
--------------------------------------------------------------------------------
-
-  Started : keskiviikko 13. syyskuuta 2023 16.02.47
-   Source : D:\testi_projektit\
-     Dest : v:\butest1\PTEC38-PC\testi_projektit_1\1\
-
-    Files : *.*
-	    
-  Options : *.* /S /E /DCOPY:DA /COPY:DAT /Z /MT:16 /R:1 /W:1 
-
-------------------------------------------------------------------------------
-
-	    New File  		       0	D:\testi_projektit\TESTFILE1.txt100%  
-	    New File  		       8	D:\testi_projektit\tf2.txt  0%  100%  
-	    New File  		       0	D:\testi_projektit\tmp\123.txt100%  
-	    New File  		     204	D:\testi_projektit\ML\ML_dataset_test\albumentations\.deepsource.toml100%  
-	    New File  		      63	D:\testi_projektit\ML\ML_dataset_test\albumentations\.gitattributes100%  
-	    New File  		    2456	D:\testi_projektit\ML\ML_dataset_test\albumentations\.gitignore100%  
-	    New File  		    1075	D:\testi_projektit\ML\ML_dataset_test\albumentations\.pre-commit-config.yaml100%  
-	    New File  		     205	D:\testi_projektit\ML\ML_dataset_test\albumentations\.readthedocs.yml100%  
-	    New File  		     557	D:\testi_projektit\ML\ML_dataset_test\albumentations\black.toml100%  
-	    New File  		    1134	D:\testi_projektit\ML\ML_dataset_test\albumentations\LICENSE100%  
-	    New File  		     186	D:\testi_projektit\ML\ML_dataset_test\albumentations\MANIFEST.in100%  
-	    New File  		   33710	D:\testi_projektit\ML\ML_dataset_test\albumentations\README.md100%  
-	    New File  		     318	D:\testi_projektit\ML\ML_dataset_test\albumentations\setup.cfg100%  
-	    New File  		    3115	D:\testi_projektit\ML\ML_dataset_test\albumentations\setup.py100%  
-	    New File  		     320	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\config100%  
-	    New File  		      73	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\description100%  
-	    New File  		    3230	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\FETCH_HEAD100%  
-	    New File  		      23	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\HEAD100%  
-	    New File  		    8925	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\index100%  
-	    New File  		    2822	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\packed-refs100%  
-	    New File  		     836	D:\testi_projektit\ML\ML_dataset_test\albumentations\.github\FUNDING.yml100%  
-	    New File  		       1	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations.egg-info\dependency_links.txt100%  
-	    New File  		   37260	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations.egg-info\PKG-INFO100%  
-	    New File  		     171	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations.egg-info\requires.txt100%  
-	    New File  		    2589	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations.egg-info\SOURCES.txt100%  
-	    New File  		      15	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations.egg-info\top_level.txt100%  
-	    New File  		    3058	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\random_utils.py100%  
-	    New File  		     492	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\__init__.py100%  
-	    New File  		   22410	D:\testi_projektit\ML\ML_dataset_test\albumentations\benchmark\benchmark.py100%  
-	    New File  		     365	D:\testi_projektit\ML\ML_dataset_test\albumentations\benchmark\Dockerfile100%  
-	    New File  		    1042	D:\testi_projektit\ML\ML_dataset_test\albumentations\benchmark\README.md100%  
-	    New File  		     158	D:\testi_projektit\ML\ML_dataset_test\albumentations\benchmark\requirements.txt100%  
-	    New File  		    2688	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\conftest.py100%  
-	    New File  		   33788	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_augmentations.py100%  
-	    New File  		   11942	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_bbox.py100%  
-	    New File  		   16100	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_core.py100%  
-	    New File  		   43023	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_functional.py100%  
-	    New File  		   11482	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_imgaug.py100%  
-	    New File  		    2385	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_imgaug_imports.py100%  
-	    New File  		   12872	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_keypoint.py100%  
-	    New File  		    6946	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_pytorch.py100%  
-	    New File  		    1008	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_random.py100%  
-	    New File  		   32930	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_serialization.py100%  
-	    New File  		   50480	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\test_transforms.py100%  
-	    New File  		    4967	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\utils.py100%  
-	    New File  		       0	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\__init__.py100%  
-	    New File  		    7491	D:\testi_projektit\ML\ML_dataset_test\albumentations\tools\make_transforms_docs.py100%  
-	    New File  		  300935	D:\testi_projektit\ML\ML_dataset_test\albumentations\dist\albumentations-1.3.0-py3.7.egg100%  
-	    New File  		     852	D:\testi_projektit\ML\ML_dataset_test\albumentations\conda.recipe\build_upload.sh100%  
-	    New File  		      36	D:\testi_projektit\ML\ML_dataset_test\albumentations\conda.recipe\conda_build_config.yaml100%  
-	    New File  		     802	D:\testi_projektit\ML\ML_dataset_test\albumentations\conda.recipe\meta.yaml100%  
-	    New File  		    1012	D:\testi_projektit\ML\ML_dataset_test\albumentations\.github\ISSUE_TEMPLATE\add-a-company-as-a-user-of-albumentations.yaml100%  
-	    New File  		     740	D:\testi_projektit\ML\ML_dataset_test\albumentations\.github\ISSUE_TEMPLATE\bug-report.md100%  
-	    New File  		     248	D:\testi_projektit\ML\ML_dataset_test\albumentations\.github\ISSUE_TEMPLATE\documentation.md100%  
-	    New File  		    2922	D:\testi_projektit\ML\ML_dataset_test\albumentations\.github\workflows\ci.yml100%  
-	    New File  		     648	D:\testi_projektit\ML\ML_dataset_test\albumentations\.github\workflows\upload_to_pypi.yml100%  
-	    New File  		     217	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\logs\HEAD100%  
-	    New File  		     240	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\info\exclude100%  
-	    New File  		     478	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\applypatch-msg.sample100%  
-	    New File  		     896	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\commit-msg.sample100%  
-	    New File  		    4655	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\fsmonitor-watchman.sample100%  
-	    New File  		     189	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\post-update.sample100%  
-	    New File  		     424	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\pre-applypatch.sample100%  
-	    New File  		    1643	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\pre-commit.sample100%  
-	    New File  		     416	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\pre-merge-commit.sample100%  
-	    New File  		    1374	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\pre-push.sample100%  
-	    New File  		    4898	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\pre-rebase.sample100%  
-	    New File  		     544	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\pre-receive.sample100%  
-	    New File  		    1492	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\prepare-commit-msg.sample100%  
-	    New File  		    3650	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\hooks\update.sample100%  
-	    New File  		   13048	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\domain_adaptation.py100%  
-	    New File  		   41132	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\functional.py100%  
-	    New File  		   98838	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\transforms.py100%  
-	    New File  		    6890	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\utils.py100%  
-	    New File  		     680	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\__init__.py100%  
-	    New File  		    2576	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\imgaug\stubs.py100%  
-	    New File  		   14596	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\imgaug\transforms.py100%  
-	    New File  		       0	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\imgaug\__init__.py100%  
-	    New File  		    1111	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\pytorch\functional.py100%  
-	    New File  		    4309	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\pytorch\transforms.py100%  
-	    New File  		      69	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\pytorch\__init__.py100%  
-	    New File  		   20886	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\bbox_utils.py100%  
-	    New File  		   22788	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\composition.py100%  
-	    New File  		    9872	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\keypoints_utils.py100%  
-	    New File  		   10322	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\serialization.py100%  
-	    New File  		   11056	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\transforms_interface.py100%  
-	    New File  		    4912	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\utils.py100%  
-	    New File  		       0	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\core\__init__.py100%  
-	    New File  		   66535	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\files\output_v1.1.0_without_totensor.json100%  
-	    New File  		   64623	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\files\output_v1.1.0_with_totensor.json100%  
-	    New File  		    6473	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\files\transform_serialization_v2_without_totensor.json100%  
-	    New File  		    6536	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\files\transform_serialization_v2_with_totensor.json100%  
-	    New File  		    8236	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\files\transform_v1.1.0_without_totensor.json100%  
-	    New File  		    8340	D:\testi_projektit\ML\ML_dataset_test\albumentations\tests\files\transform_v1.1.0_with_totensor.json100%  
-	    New File  		      41	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\refs\heads\master100%  
-	    New File  		  140680	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\objects\pack\pack-1e640e0eea17f89ff5073081b977f57f22b66ad8.idx100%  
-	    New File  		  99.5 m	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\objects\pack\pack-1e640e0eea17f89ff5073081b977f57f22b66ad8.pack100%  
-	    New File  		  151208	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\objects\pack\pack-b8b9a13e9a03cb6458849a087e41607722d9af43.idx100%  
-	    New File  		  99.6 m	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\objects\pack\pack-b8b9a13e9a03cb6458849a087e41607722d9af43.pack100%  
-	    New File  		   41778	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\geometric\functional.py100%  
-	    New File  		    7574	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\geometric\resize.py100%  
-	    New File  		   12254	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\geometric\rotate.py100%  
-	    New File  		   64342	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\geometric\transforms.py100%  
-	    New File  		     100	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\geometric\__init__.py100%  
-	    New File  		   10626	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\crops\functional.py100%  
-	    New File  		   38184	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\crops\transforms.py100%  
-	    New File  		      54	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\crops\__init__.py100%  
-	    New File  		    3828	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\blur\functional.py100%  
-	    New File  		   19260	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\blur\transforms.py100%  
-	    New File  		      54	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\blur\__init__.py100%  
-	    New File  		    3058	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\random_utils.py100%  
-	    New File  		     492	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\__init__.py100%  
-	    New File  		    2344	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\channel_dropout.py100%  
-	    New File  		    7274	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\coarse_dropout.py100%  
-	    New File  		    2469	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\cutout.py100%  
-	    New File  		     904	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\functional.py100%  
-	    New File  		    6810	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\grid_dropout.py100%  
-	    New File  		    3458	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\mask_dropout.py100%  
-	    New File  		     144	D:\testi_projektit\ML\ML_dataset_test\albumentations\albumentations\augmentations\dropout\__init__.py100%  
-	    New File  		      32	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\refs\remotes\origin\HEAD100%  
-	    New File  		     217	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\logs\refs\heads\master100%  
-	    New File  		   20886	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\bbox_utils.py100%  
-	    New File  		   22788	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\composition.py100%  
-	    New File  		    9872	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\keypoints_utils.py100%  
-	    New File  		   10322	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\serialization.py100%  
-	    New File  		   11056	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\transforms_interface.py100%  
-	    New File  		    4912	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\utils.py100%  
-	    New File  		       0	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\core\__init__.py100%  
-	    New File  		     217	D:\testi_projektit\ML\ML_dataset_test\albumentations\.git\logs\refs\remotes\origin\HEAD100%  
-	    New File  		   13048	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\domain_adaptation.py100%  
-	    New File  		   41132	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\functional.py100%  
-	    New File  		   98838	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\transforms.py100%  
-	    New File  		    6890	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\utils.py100%  
-	    New File  		     680	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\__init__.py100%  
-	    New File  		    1111	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\pytorch\functional.py100%  
-	    New File  		    4309	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\pytorch\transforms.py100%  
-	    New File  		      69	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\pytorch\__init__.py100%  
-	    New File  		    2576	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\imgaug\stubs.py100%  
-	    New File  		   14596	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\imgaug\transforms.py100%  
-	    New File  		       0	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\imgaug\__init__.py100%  
-	    New File  		    3828	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\blur\functional.py100%  
-	    New File  		   19260	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\blur\transforms.py100%  
-	    New File  		      54	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\blur\__init__.py100%  
-	    New File  		   10626	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\crops\functional.py100%  
-	    New File  		   38184	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\crops\transforms.py100%  
-	    New File  		      54	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\crops\__init__.py100%  
-	    New File  		    2344	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\channel_dropout.py100%  
-	    New File  		    7274	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\coarse_dropout.py100%  
-	    New File  		    2469	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\cutout.py100%  
-	    New File  		     904	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\functional.py100%  
-	    New File  		    6810	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\grid_dropout.py100%  
-	    New File  		    3458	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\mask_dropout.py100%  
-	    New File  		     144	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\dropout\__init__.py100%  
-	    New File  		   41778	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\geometric\functional.py100%  
-	    New File  		    7574	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\geometric\resize.py100%  
-	    New File  		   12254	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\geometric\rotate.py100%  
-	    New File  		   64342	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\geometric\transforms.py100%  
-	    New File  		     100	D:\testi_projektit\ML\ML_dataset_test\albumentations\build\lib\albumentations\augmentations\geometric\__init__.py100%  
-
-------------------------------------------------------------------------------
-
-               Total    Copied   Skipped  Mismatch    FAILED    Extras
-    Dirs :        52        52         0         0         0         0
-   Files :       158       158         0         0         0         0
-   Bytes :  201.28 m  201.28 m         0         0         0         0
-   Times :   0:00:00   0:00:00                       0:00:00   0:00:00
-
-
-   Speed :           3350272793 Bytes/sec.
-   Speed :           191704.146 MegaBytes/min.
-   Ended : keskiviikko 13. syyskuuta 2023 16.02.47
-
+Error:2024-02-12T13:03:17.4211441+02:00

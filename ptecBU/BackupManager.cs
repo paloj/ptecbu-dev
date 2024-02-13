@@ -1,9 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Linq;
 using System.Text;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 public class BackupManager
 {
@@ -38,7 +40,7 @@ public class BackupManager
         Destination = customDestination != null ? Path.Combine(customDestination, hostname) : GetBackupDestination();
     }
 
-    public static void PerformBackup(string customDestination = null)
+    public static void PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
     {
         // Use the customDestination if provided, otherwise use the default destination
         // Append the hostname to the customDestination before using it
@@ -52,13 +54,13 @@ public class BackupManager
         }
 
         // Load folders to backup
-        string[] folders = File.Exists("folders.txt") 
-            ? File.ReadAllLines("folders.txt").Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() 
+        string[] folders = File.Exists(folderSource) 
+            ? File.ReadAllLines(folderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() 
             : new string[0];
 
-        // Load excluded items
-        string[] excludedItems = File.Exists("excludedItems.txt") 
-            ? File.ReadAllLines("excludedItems.txt").Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() 
+        // Load excluded items list
+        string[] excludedItems = File.Exists(excludeSource) 
+            ? File.ReadAllLines(excludeSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() 
             : new string[0];
 
         // Update tray icon tooltip to "Backup in progress"
@@ -70,23 +72,39 @@ public class BackupManager
         }
 
         // Generate exclusion parameters for robocopy
-        string excludeParams = "";
+        // Lists to hold excluded directories and files
+        List<string> excludedDirs = new List<string>();
+        List<string> excludedFiles = new List<string>();
+
         foreach (string item in excludedItems)
         {
-            // Check if item is a folder, file, or file extension
             if (Directory.Exists(item)) // Folder
             {
-                excludeParams += $"/XD \"{item}\" ";
+                excludedDirs.Add(item);
             }
             else if (File.Exists(item)) // File
             {
-                excludeParams += $"/XF \"{item}\" ";
+                excludedFiles.Add(item);
+            }
+            else if (item.StartsWith(@"*") && (item.EndsWith(@"\") || item.EndsWith(@"/"))) // Folder with wildcard
+            {
+                Match match = Regex.Match(item, @"[^*\\/]+");
+                if (match.Success)
+                {
+                    excludedDirs.Add(match.Value);
+                }
             }
             else // Assume file extension
             {
-                excludeParams += $"/XF \"{item}\" ";
+                excludedFiles.Add(item);
             }
         }
+
+        // Generate exclusion parameters for robocopy
+        string excludeDirsParams = excludedDirs.Count > 0 ? $"/XD {string.Join(" ", excludedDirs.Select(d => $"\"{d}\""))} " : "";
+        string excludeFilesParams = excludedFiles.Count > 0 ? $"/XF {string.Join(" ", excludedFiles.Select(f => $"\"{f}\""))} " : "";
+
+        string excludeParams = excludeDirsParams + excludeFilesParams;
 
         bool isTwoBackupsEnabled = IsTwoBackupsEnabled();
         string destinationSuffix = "";
@@ -102,19 +120,52 @@ public class BackupManager
             destinationSuffix = "_1"; // Always use the "_1" suffix if twobackups is disabled
         }
 
+        // Method to generate a short hash for a given folder path
+        static string GenerateShortHash(string folderPath)
+        {
+            byte[] hashBytes = SHA1.HashData(Encoding.UTF8.GetBytes(folderPath));
+            // Convert the first 4 bytes of the hash to a hexadecimal string for a shorter identifier
+            string shortHash = BitConverter.ToString(hashBytes, 0, 4).Replace("-", "").ToLower();
+            return shortHash;
+        }
+
         // Perform backup for each folder
         for (int i = 0; i < folders.Length; i++)
         {
-            string folder = folders[i];
-            
-            // Build the destination path with numeration
-            string folderDestination = Path.Combine(destination, Path.GetFileName(folder)+destinationSuffix, (i + 1).ToString());
-            
+            // Get the source folder
+            // Normalize the folder path
+            string folder = folders[i].TrimEnd('\\');
+
+            // Determine if the source is a drive root
+            bool isDriveRoot = Path.GetPathRoot(folder).Equals(folder, StringComparison.OrdinalIgnoreCase);
+
+            string folderNameForDestination;
+            if (isDriveRoot)
+            {
+                folderNameForDestination = $"{folder.Replace(":", "")}_drive";
+            }
+            else
+            {
+                // Use the last folder name and append a short hash
+                string shortHash = GenerateShortHash(folder);
+                folderNameForDestination = $"{Path.GetFileName(folder)}_{shortHash}";
+            }
+
+            // Build the destination path
+            string folderDestination = Path.Combine(destination, folderNameForDestination + destinationSuffix);
+
             // Validate the folderDestination path
             if (PathValidator.IsValidPath(folderDestination))
             {
+                // Remove trailing backslash from source and destination
+                folder = folder.TrimEnd('\\');
+                folderDestination = folderDestination.TrimEnd('\\');
+
+                // Read MT value from config.ini
+                string mtValue = ReadMTValueFromConfig();
+
                 // Build robocopy command
-                string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:16 /Z /LOG:backup.log {excludeParams}";
+                string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i+1}.log {excludeParams} /A-:SH";
                 File.WriteAllText("robocopyArgs.txt", robocopyArgs.ToString());
                 
                 // Run robocopy
@@ -148,6 +199,24 @@ public class BackupManager
                 // Check if robocopy was successful
                 if (pRobocopy.ExitCode <= 7) // robocopy exit codes 0-7 are considered successful
                 {
+                    try
+                    {                    
+                    // Command to remove hidden and system attributes
+                    string attribArgs = $"-s -h \"{folderDestination}\"";
+                    ProcessStartInfo psiAttrib = new ProcessStartInfo("attrib.exe", attribArgs)
+                    {
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    };
+                    Process pAttrib = Process.Start(psiAttrib);
+                    pAttrib.WaitForExit();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Write current timestamp and error to file
+                        File.WriteAllText("attribFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {ex}");
+                    }
+
                     // Write current timestamp to file
                     File.WriteAllText("lastBackup.txt", DateTime.Now.ToString("o"));
                 }
@@ -174,6 +243,11 @@ public class BackupManager
 
         }
 
+        if(exitAfter)
+        {
+            Application.Exit();
+        }
+
         // Stop blinking tray icon
         BlinkTrayIcon(false);
 
@@ -181,7 +255,24 @@ public class BackupManager
         Program.UpdateTrayIconTooltip();
     }
 
-    private static bool IsTwoBackupsEnabled()
+    private static string ReadMTValueFromConfig() // Read the MT value from config.ini that is used in robocopy to set the number of threads
+    {
+        string mtValue = "16"; // Default value
+        if (File.Exists("config.ini"))
+        {
+            foreach (var line in File.ReadLines("config.ini"))
+            {
+                if (line.StartsWith("robocopymt="))
+                {
+                    mtValue = line.Substring("robocopymt=".Length);
+                    break;
+                }
+            }
+        }
+        return mtValue;
+    }
+
+    private static bool IsTwoBackupsEnabled() // Check if the twobackups setting is enabled in config.ini
     {
         string configPath = "config.ini";
         string backupKey = "twobackups=";
@@ -224,7 +315,7 @@ public class BackupManager
     private static CancellationTokenSource blinkingCancellationTokenSource;
     private static Task blinkingTask;
 
-    private static async void BlinkTrayIcon(bool start)
+    private static async void BlinkTrayIcon(bool start) // Blink the tray icon while backup is in progress
     {
         // Define the path to the green and yellow icons
         string greenIconPath = "Resources/green.ico";
@@ -282,7 +373,7 @@ public class BackupManager
         }
     }
 
-    public static bool IsLastBackupOlderThanOneMonth()
+    public static bool IsLastBackupOlderThanOneMonth()   // Check if the last backup was more than a month ago
     {
         if (!File.Exists("lastBackup.txt"))
         {
@@ -302,6 +393,7 @@ public class BackupManager
         return DateTime.Now - lastBackup > TimeSpan.FromDays(30);
     }
 
+/* USING DEFINED HOURS FROM CONFIG.INI INSTEAD OF HARDCODED 1 DAY.
     public static bool IsLastBackupOlderThanOneDay()
     {
         if (!File.Exists("lastBackup.txt"))
@@ -321,14 +413,102 @@ public class BackupManager
         // Check if the last backup was more than a day ago
         return DateTime.Now - lastBackup > TimeSpan.FromDays(1);
     }
+*/
+    public static bool IsLastBackupOlderThanConfigHours() // Check if the last backup was older than the defined hours in config.ini
+    {
+        string[] lines = File.ReadAllLines("config.ini");
+        string betweenKey = "hoursbetweenbackups=";
+        int hours = 24; // Default to 24 hours
 
+        foreach (var line in lines)
+        {
+            if (line.StartsWith(betweenKey))
+            {
+                if (!int.TryParse(line.Substring(betweenKey.Length), out hours))
+                {
+                    // If the hours can't be parsed, assume the last backup was too old
+                    return true;
+                }
+                break;
+            }
+        }
+
+        if (!File.Exists("lastBackup.txt"))
+        {
+            return true;
+        }
+
+        string timestampStr = File.ReadAllText("lastBackup.txt");
+        DateTime lastBackup;
+        if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
+        {
+            return true;
+        }
+
+        return DateTime.Now - lastBackup > TimeSpan.FromHours(hours);
+    }
+
+    // Check if backup location is reachable on network or in local drive
     public static bool IsBackupLocationReachable(string destination = null)
     {
-        // Extract the first part of the destination path
-        string firstPart = Path.GetPathRoot(destination ?? GetBackupDestination());
+        try
+        {
+            string path = destination ?? GetBackupDestination();
 
-        // Check if the first part of the path is reachable
-        return Directory.Exists(firstPart);
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            return TryWriteAndDeleteFile(path);
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            return false;
+        }
+    }
+
+    private static bool TryWriteAndDeleteFile(string path)  // Try to write and delete a file to check if the directory is writable
+    {
+        string testFilePath = Path.Combine(path, "testfile.tmp");
+
+        try
+        {
+            // Check if the directory exists, create if it doesn't
+            var directory = Path.GetDirectoryName(testFilePath);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            // Try to write an empty file
+            File.WriteAllText(testFilePath, string.Empty);
+
+            // If successful, delete the file and return true
+            File.Delete(testFilePath);
+            return true;
+        }
+        catch
+        {
+            // If any error occurs, return false
+            return false;
+        }
+    }
+
+
+    private static void LogError(Exception ex) // Log error to file
+    {
+        string logFilePath = "network_check_error.log";
+        string errorMessage = $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}\nTimestamp: {DateTime.Now}\n";
+
+        try
+        {
+            File.AppendAllText(logFilePath, errorMessage);
+            //MessageBox.Show($"Error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch (Exception fileEx)
+        {
+            MessageBox.Show($"Failed to log to file: {fileEx.Message}", "Logging Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
 }

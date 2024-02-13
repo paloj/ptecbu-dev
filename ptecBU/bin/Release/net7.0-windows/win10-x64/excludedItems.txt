@@ -1,0 +1,4 @@
+*\System Volume Information\
+*\$RECYCLE.BIN\
+*\siirto\
+*.bac

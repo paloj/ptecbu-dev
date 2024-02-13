@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\janne\\Desktop\\ptecBU\\dev\\ptecBU\\ptecBU.csproj": {}
+    "V:\\ptecBU\\dev\\ptecBU\\ptecBU.csproj": {}
   },
   "projects": {
-    "C:\\Users\\janne\\Desktop\\ptecBU\\dev\\ptecBU\\ptecBU.csproj": {
-      "version": "1.0.0.1",
+    "V:\\ptecBU\\dev\\ptecBU\\ptecBU.csproj": {
+      "version": "1.0.0.16",
       "restore": {
-        "projectUniqueName": "C:\\Users\\janne\\Desktop\\ptecBU\\dev\\ptecBU\\ptecBU.csproj",
+        "projectUniqueName": "V:\\ptecBU\\dev\\ptecBU\\ptecBU.csproj",
         "projectName": "ptecBU",
-        "projectPath": "C:\\Users\\janne\\Desktop\\ptecBU\\dev\\ptecBU\\ptecBU.csproj",
-        "packagesPath": "C:\\Users\\janne\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\janne\\Desktop\\ptecBU\\dev\\ptecBU\\obj\\",
+        "projectPath": "V:\\ptecBU\\dev\\ptecBU\\ptecBU.csproj",
+        "packagesPath": "C:\\Users\\JPA\\.nuget\\packages\\",
+        "outputPath": "V:\\ptecBU\\dev\\ptecBU\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\janne\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\JPA\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net7.0-windows"
@@ -56,7 +56,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.401\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.405\\RuntimeIdentifierGraph.json"
         }
       }
     }

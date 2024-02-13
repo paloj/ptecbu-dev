@@ -1,9 +1,10 @@
+// Build command
+// dotnet publish -c Release -r win10-x64 --self-contained false
 using System;
 using System.IO;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-
 
 static class Program
 {
@@ -11,6 +12,7 @@ static class Program
     public static NotifyIcon trayIcon;
     public static bool destinationReachable;
     public static bool IsRunningWithArguments { get; private set; }
+    public static string TickFolderSource = "folders.txt";
 
     [STAThread]
     static void Main(string[] args)
@@ -27,12 +29,30 @@ static class Program
             System.Threading.Thread.Sleep(40000); // Delay for 40 seconds
         }
 
-        // Check for "-now" argument
+        // Check for arguments
         string customDestination = GetCustomDestination(args);
+        string FolderSource = GetCustomFolderSource(args);
+        TickFolderSource = FolderSource;
+        string ExcludeListSource = GetCustomExcludeListSource(args);
+
+        // Check that custom foldersource and excludeitemlist exist
+        if (!File.Exists(FolderSource))
+            {
+                MessageBox.Show($"PtecBU: Backup folder list {FolderSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Application.Exit();
+            }
+
+        if (!File.Exists(ExcludeListSource))
+            {
+                MessageBox.Show($"PtecBU: Exclude items list {ExcludeListSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Application.Exit();
+            }
+
+        // If -now argument is given then we dont open the tray app. Just do the backup in the background.
         if (args.Contains("-now"))
         {
             // Perform backup with the custom destination if provided
-            BackupManager.PerformBackup(customDestination);
+            BackupManager.PerformBackup(customDestination, FolderSource, ExcludeListSource, true);
         }
         else
         {
@@ -41,7 +61,7 @@ static class Program
             Application.SetCompatibleTextRenderingDefault(false);
 
             // Check if folders.txt exists
-            if (!File.Exists("folders.txt"))
+            if (!File.Exists(FolderSource))
             {
                 // If it doesn't exist, show the SettingsForm
                 var settingsForm = new SettingsForm();
@@ -164,10 +184,17 @@ static class Program
             if(!Program.destinationReachable)
             {
                 neverBackupText = "Backup destination unreachable.\nLast successful backup: Never";
+                // Set the tray icon to red when the destination is not reachable
                 trayIcon.Icon = new Icon("Resources/red.ico");
             }
+            else
+            {
+                // Optionally set a different text when the destination is reachable
+                neverBackupText = "Backup destination reachable.\nLast successful backup: [Your Date Here]";
+                // Set the tray icon to white (or another icon) when the destination is reachable
+                trayIcon.Icon = new Icon("Resources/white.ico");
+            }
             trayIcon.Text = neverBackupText;
-            trayIcon.Icon = new Icon("Resources/white.ico");
         }
     }
 
@@ -189,7 +216,7 @@ static class Program
         // Look for the -destination argument in the command line arguments
         for (int i = 0; i < args.Length - 1; i++)
         {
-            if (args[i] == "-destination")
+            if (args[i] == "-destination" || args[i] == "-d")
             {
                 return args[i + 1];
             }
@@ -215,6 +242,36 @@ static class Program
         // Return the default value if no custom destination is found
         return defaultValue;
     }
+
+    private static string GetCustomFolderSource(string[] args)
+    {
+        // Look for the -foldersource argument in the command line arguments
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-foldersource" || args[i] == "-f")
+            {
+                return args[i + 1];
+            }
+        }
+
+        // Return the default value if no custom folder list source is found
+        return "folders.txt";
+    }
+
+    private static string GetCustomExcludeListSource(string[] args)
+    {
+        // Look for the -foldersource argument in the command line arguments
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-excludesource" || args[i] == "-e")
+            {
+                return args[i + 1];
+            }
+        }
+
+        // Return the default value if no custom exclude item list is found
+        return "excludedItems.txt";
+    }
 }
 
 class CustomApplicationContext : ApplicationContext
@@ -231,7 +288,7 @@ class CustomApplicationContext : ApplicationContext
         {
             // Create the backup timer
             backupTimer = new System.Windows.Forms.Timer();
-            backupTimer.Interval = 60000; // 1 minute
+            backupTimer.Interval = 60000; // 1 minutes
             backupTimer.Tick += BackupTimer_Tick;
             backupTimer.Start();
         }
@@ -257,40 +314,50 @@ class CustomApplicationContext : ApplicationContext
 
     private void BackupTimer_Tick(object sender, EventArgs e)
     {
-        // Check if the last backup was over 24 hours ago and no backup is currently in progress
-        if (BackupManager.IsLastBackupOlderThanOneDay() && !BackupManager.isBlinking)
+        string filePath = Program.TickFolderSource;
+
+        // Check if a list of folders to be backed up exist
+        if (File.Exists(filePath))
         {
-            // Check if a connection to the backup location exists
-            if (BackupManager.IsBackupLocationReachable())
+            string[] lines = File.ReadAllLines(filePath);
+            if (lines.Length >= 1)
             {
-                Program.destinationReachable = true;
-
-                string configPath = "config.ini";
-                string destinationKey = "destination=";
-                string tickDestination = @"\\192.168.11.99\backup\";
-
-                if (File.Exists(configPath))
-                {
-                    string[] configLines = File.ReadAllLines(configPath);
-                    string destinationLine = configLines.FirstOrDefault(line => line.StartsWith(destinationKey, StringComparison.OrdinalIgnoreCase));
-
-                    if (destinationLine != null)
+                // Check if the last backup was over 24 hours ago and no backup is currently in progress
+                if (BackupManager.IsLastBackupOlderThanConfigHours() && !BackupManager.isBlinking)
+                {   
+                    // Check if a connection to the backup location exists
+                    if (BackupManager.IsBackupLocationReachable())
                     {
-                        tickDestination = destinationLine.Substring(destinationKey.Length).Trim();
+                        Program.destinationReachable = true;
+
+                        string configPath = "config.ini";
+                        string destinationKey = "destination=";
+                        string tickDestination = @"\\TRUENAS\backup\";
+
+                        if (File.Exists(configPath))
+                        {
+                            string[] configLines = File.ReadAllLines(configPath);
+                            string destinationLine = configLines.FirstOrDefault(line => line.StartsWith(destinationKey, StringComparison.OrdinalIgnoreCase));
+
+                            if (destinationLine != null)
+                            {
+                                tickDestination = destinationLine.Substring(destinationKey.Length).Trim();
+                            }
+                        }
+                        
+                        // Perform backup
+                        BackupManager.PerformBackup(tickDestination);
+
+                        // Update tray icon tooltip text after backup
+                        Program.UpdateTrayIconTooltip();
+                    }
+                    else
+                    {
+                        // Change the tray icon to red
+                        trayIcon.Icon = new Icon("Resources/red.ico");
+                        Program.destinationReachable = false;
                     }
                 }
-                
-                // Perform backup
-                BackupManager.PerformBackup(tickDestination);
-
-                // Update tray icon tooltip text after backup
-                Program.UpdateTrayIconTooltip();
-            }
-            else
-            {
-                // Change the tray icon to red
-                trayIcon.Icon = new Icon("Resources/red.ico");
-                Program.destinationReachable = false;
             }
         }
     }

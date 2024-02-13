@@ -1,1 +1,1 @@
-"D:\testi_projektit" "v:\butest1\PTEC38-PC\testi_projektit_1\1 " /E /R:1 /W:1 /MT:16 /Z /LOG:backup.log 
+"C:\Projektit\testi123" "\\192.168.11.110\backup\PTEC38-PC\testi123_bd466a60_1 " /E /R:1 /W:1 /MT:16 /Z /LOG:backup_2.log /XD "System Volume Information" "$RECYCLE.BIN" "siirto" /XF "*.bac"  /A-:SH

@@ -1,0 +1,42 @@
+∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭
+ptecBU VARMUUSKOPIO OHJELMISTO OHJE
+∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭∭
+
+∎ Asennus
+- Asenna ptecBU käyttämällä ptecbu-setup.exe-asennusohjelmaa tai kopioimalla ptecBU-hakemisto haluamaasi sijaintiin.
+
+∎ Backup tallennuspaikka
+- Määrittele paikka, jonne varmuuskopiot tallennetaan. Tämä tehdään asennushakemiston config.ini-tiedoston destination=-rivillä. Esimerkki: destination=\\192.168.11.110\backup.
+
+∎ Ohjelman käyttö
+Asetukset
+1. Käynnistä ptecBU-ohjelma. Ohjelma käynnistyy, ja kuvake ilmestyy Windowsin järjestelmäpalkin ilmoitusalueelle.
+2. Mikäli asetusikkuna ei avaudu automaattisesti, napsauta hiiren oikealla napilla BU-kuvaketta ilmoitusalueella ja valitse 'Settings'.
+3. Lisää 'Backup folders list'-listaan kansiot, jotka haluat varmuuskopioida.
+4. Lisää 'Exclude list'-listaan tiedostot, kansiot ja tiedostopäätteet, joita et halua varmuuskopioida. Lisää vain yksi kohde per rivi. Esimerkkejä: *.BAC, *.jpg, d:\ohjelma\siirto\, *\siirto\.
+5. Aktivoi 'Launch on Windows Startup' -valinta, mikäli haluat ohjelman käynnistyvän automaattisesti Windowsin mukana.
+6. Tallenna asetukset painamalla 'Save'.
+
+- Varmuuskopiointi
+1. Ohjelma suorittaa varmuuskopioinnin automaattisesti kerran päivässä. Se kopioi vain valittujen kansioiden muutokset, eli tekee inkrementaalisen varmuuskopion.
+2. Jos haluat suorittaa varmuuskopioinnin välittömästi, avaa ohjelman valikko napsauttamalla kuvaketta hiiren oikealla napilla ja valitse 'Backup Now'.
+3. Ajastettu varmuuskopio ('Scheduled Task'):
+	- Avaa Windowsin 'Scheduled Tasks' -työkalu ja luo uusi ajastettu tehtävä.
+	- Luo uusi basic task ja anna sille nimi sekä kuvaus. Esim viikkobackup. Paina "Next"
+	- Valitse koska haluat taskin käynnistyvän. Esim Weekly. Paina "Next"
+	- Määritä tarvittavat lisätiedot. Paina "Next".
+	- Kun määritys kysyy "What action do you want the task to perform?" valitse Start a program ja paina "Next"
+	- Program/script kohtaan selaa tai kirjoita btecBU.exe tiedsoton sijainti. Esim: D:\Priatec\ptecBU\ptecBU.exe
+	- Add arguments kohtaan lisää seuraavat argumentit: -now -destination \\192.168.11.xxx\backup muista vaihtaa ip osoitteen tilalle haluamasi osoite tai hakemisto.
+	  esim. -now -destination D:\localbackup\ tai -now -destination \\192.168.11.100\backup\NIMI\weekly
+	- Paina "Next" ja "Finish"
+	- Testaa luomasi task valitsemalla se ja hiiren oikealla napilla avautuvasta valikosta "Run".
+	- Mikäli argumentteihin ei määritetä -destination argumenttia sekä kohdetta, pelkkä -now argumentti tekee varmuuskopion config.ini tiedostossa määritettyyn hakemistoon.
+	- Jos haluat käyttää custom listaa backapattavista kansioista niin käytä -foldersource jokusource.txt tai -f jokusource.txt argumenttia
+	- Jos haluat käyttää custom exclude listaa jossa määritetty mitä EI backapata niin lisää argumentti -excludesource jokulist.txt tai -e jokulist.txt
+	- Esimerkki argumentit jossa custom kohde ja source list: -now -destination \\192.168.11.100\backup\mypc\weekly -foldersource weeklyfolders.txt
+	
+∎ Muuta
+- Edellisen varmuuskopion ajankohta näkyy, kun viet hiiren BU-kuvakkeen päälle ilmoitusalueella.
+- Kuvake vilkkuu varmuuskopioinnin aikana.
+- Kuvake muuttuu punaiseksi, jos edellisestä varmuuskopiosta on kulunut yli kuukausi.

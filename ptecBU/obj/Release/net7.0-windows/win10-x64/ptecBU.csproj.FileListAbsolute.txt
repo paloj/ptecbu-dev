@@ -1,4 +1,3 @@
-V:\ptecBU\dev\ptecBU\obj\Release\net7.0-windows\win10-x64\ptecBU.csproj.AssemblyReference.cache
 V:\ptecBU\dev\ptecBU\obj\Release\net7.0-windows\win10-x64\ptecBU.GeneratedMSBuildEditorConfig.editorconfig
 V:\ptecBU\dev\ptecBU\obj\Release\net7.0-windows\win10-x64\ptecBU.AssemblyInfoInputs.cache
 V:\ptecBU\dev\ptecBU\obj\Release\net7.0-windows\win10-x64\ptecBU.AssemblyInfo.cs
@@ -24,3 +23,7 @@ V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\Launcher\Launcher.dll
 V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\Launcher\Launcher.exe
 V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\Launcher\Launcher.pdb
 V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\Launcher\Launcher.runtimeconfig.json
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\system_backup.bat
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\OHJE.txt
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\excludedItems.txt
+V:\ptecBU\dev\ptecBU\bin\Release\net7.0-windows\win10-x64\updater\updater.exe

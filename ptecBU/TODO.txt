@@ -1,1 +1,2 @@
+-build: dotnet publish -c Release -r win10-x64 --self-contained false
 -Collect robocopy logs of all folders to single logfile

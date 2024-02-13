@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <ApplicationIcon>Resources\white.ico</ApplicationIcon>
     <TargetFramework>net7.0-windows</TargetFramework>
-    <Version>1.0.0.1</Version>
+    <Version>1.0.0.16</Version>
     <Nullable>disable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -22,8 +22,33 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <None Update="excludedItems.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="system_backup.bat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="OHJE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <None Include="..\Launcher\Launcher\bin\Release\net7.0-windows\win10-x64\publish\**">
       <Link>Launcher\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\updater\bin\Release\net7.0\win-x64\publish\**">
+      <Link>updater\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
