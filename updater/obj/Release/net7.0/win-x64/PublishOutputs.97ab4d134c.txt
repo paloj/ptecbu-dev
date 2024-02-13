@@ -1,1 +1,0 @@
-V:\ptecBU\dev\ptecBU\updater\bin\Release\net7.0\win-x64\publish\updater.exe
