@@ -4,3 +4,4 @@ Launcher/bin
 Launcher/obj
 updater/bin
 updater/obj
+inno setup/*.exe
