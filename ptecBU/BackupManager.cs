@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 public class BackupManager
 {
@@ -249,7 +250,8 @@ public class BackupManager
         }
 
         // Add zip to backup if enabled in config.ini
-        if (IsZipInBackupEnabled())
+        //if (IsZipInBackupEnabled())
+        if (true)
         {
             // Call the zip function from SettignsForm.cs
             var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class

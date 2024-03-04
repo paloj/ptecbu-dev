@@ -646,9 +646,9 @@ public class FolderArchiver
     private string destinationPath;
     private const string LogFilePath = "archive_err.log";
 
-    public FolderArchiver(Label statusLabel=null)
-    {        
-        this.statusLabel = statusLabel;        
+    public FolderArchiver(Label statusLabel = null)
+    {
+        this.statusLabel = statusLabel;
         ReadConfig();
     }
 
@@ -674,7 +674,8 @@ public class FolderArchiver
         catch (Exception ex)
         {
             LogError($"Error reading config file: {ex.Message}");
-            if (statusLabel != null){
+            if (statusLabel != null)
+            {
                 UpdateStatusLabel($"Error reading config file: {ex.Message}");
             }
         }
@@ -694,29 +695,32 @@ public class FolderArchiver
 
                 if (Directory.Exists(folder))
                 {
-                    // Calculate the total size of the files in the folder
-                    long totalSize = CalculateFolderSize(folder);
-
-                    // Convert total size to gigabytes
-                    double totalSizeGB = totalSize / (1024.0 * 1024.0 * 1024.0);
-
-                    // Check if total size exceeds 1GB
-                    if (totalSizeGB > 1 && prompt)
+                    if (prompt)
                     {
-                        var result = MessageBox.Show($"The folder {folder} is larger than 1GB ({totalSizeGB:N2} GB). Do you want to continue? Choose No to skip this folder.", "Warning", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                        // Calculate the total size of the files in the folder
+                        long totalSize = CalculateFolderSize(folder);
 
-                        if (result == DialogResult.No)
+                        // Convert total size to gigabytes
+                        double totalSizeGB = totalSize / (1024.0 * 1024.0 * 1024.0);
+
+                        // Check if total size exceeds 1GB
+                        if (totalSizeGB > 1)
                         {
-                            // Skip this folder and continue to the next one
-                            continue;
+                            var result = MessageBox.Show($"The folder {folder} is larger than 1GB ({totalSizeGB:N2} GB). Do you want to continue? Choose No to skip this folder.", "Warning", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+
+                            if (result == DialogResult.No)
+                            {
+                                // Skip this folder and continue to the next one
+                                continue;
+                            }
+                            else if (result == DialogResult.Cancel)
+                            {
+                                // Cancel the entire archiving process
+                                UpdateStatusLabel("Archiving Cancelled");
+                                return;
+                            }
+                            // If DialogResult.Yes, continue with the archiving process
                         }
-                        else if (result == DialogResult.Cancel)
-                        {
-                            // Cancel the entire archiving process
-                            UpdateStatusLabel("Archiving Cancelled");
-                            return;
-                        }
-                        // If DialogResult.Yes, continue with the archiving process
                     }
 
                     // Display status of completion
@@ -739,28 +743,31 @@ public class FolderArchiver
                     ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
                     if (prompt)
                     { // Only display the status if the prompt is shown (not when the process is run in the background}
-                    UpdateStatusLabel($"Completed: {folder}");
+                        UpdateStatusLabel($"Completed: {folder}");
                     }
                 }
                 else
                 {
                     if (prompt)
                     { // Only display the status if the prompt is shown (not when the process is run in the background}
-                    MessageBox.Show($"Folder not found: {folder}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    UpdateStatusLabel($"Error: Folder not found - {folder}");
+                        MessageBox.Show($"Folder not found: {folder}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        UpdateStatusLabel($"Error: Folder not found - {folder}");
                     }
                     LogError($"Folder not found: {folder}");
                 }
             }
-            UpdateStatusLabel("Archiving Complete");
+            if (prompt)
+            { // Only display the status if the prompt is shown (not when the process is run in the background}
+                UpdateStatusLabel("Archiving Complete");
+            }
         }
         catch (Exception ex)
         {
             LogError($"Error during archiving: {ex.Message}");
             if (prompt)
             { // Only display the status if the prompt is shown (not when the process is run in the background}
-            MessageBox.Show($"Error during archiving: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            UpdateStatusLabel("Error during archiving");
+                MessageBox.Show($"Error during archiving: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                UpdateStatusLabel("Error during archiving");
             }
         }
     }
