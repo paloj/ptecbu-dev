@@ -75,7 +75,7 @@ class SettingsForm : Form
 
         // Add the ListBox to the form's controls
         Controls.Add(foldersListBox);
-                
+
         // Create the add folder button
         addFolderButton = new Button()
         {
@@ -181,7 +181,7 @@ class SettingsForm : Form
         };
         openConfigFileLinkLabel.LinkClicked += new LinkLabelLinkClickedEventHandler(OpenConfigFileLinkLabel_LinkClicked);
         Controls.Add(openConfigFileLinkLabel);
-        
+
         systemImageBackupButton = new Button()
         {
             Location = new Point(10, 395), // Adjust these values to place the button appropriately
@@ -196,7 +196,7 @@ class SettingsForm : Form
         // Calculate the new location for the CheckUpdatesButton
         int spaceBetweenButtons = 10; // Adjust the space between the buttons as needed
         Point newLocationForCheckUpdatesButton = new Point(
-            systemImageBackupButton.Location.X + systemImageBackupButton.Width + spaceBetweenButtons, 
+            systemImageBackupButton.Location.X + systemImageBackupButton.Width + spaceBetweenButtons,
             systemImageBackupButton.Location.Y);
         CheckUpdatesButton = new Button()
         {
@@ -208,7 +208,7 @@ class SettingsForm : Form
         };
         CheckUpdatesButton.Click += CheckUpdatesButton_Click;
         Controls.Add(CheckUpdatesButton);
-        
+
         ArchiveFoldersButton = new Button()
         {
             Location = new Point(10, 235), // Adjust these values to place the button appropriately
@@ -294,9 +294,9 @@ class SettingsForm : Form
             }
         }
 
-        
+
     }
-    
+
     // Display tooltip for the listbox items
     private void FoldersListBox_MouseMove(object sender, MouseEventArgs e)
     {
@@ -333,7 +333,7 @@ class SettingsForm : Form
             string ellipsis = "...";
             SizeF ellipsisSize = e.Graphics.MeasureString(ellipsis, e.Font);
             int charsToFit = fullPath.Length;
-            
+
             // Reduce the string size until it fits, including ellipsis
             while (charsToFit > 0 && (e.Graphics.MeasureString(fullPath.Substring(fullPath.Length - charsToFit), e.Font).Width + ellipsisSize.Width) > e.Bounds.Width)
             {
@@ -436,16 +436,16 @@ class SettingsForm : Form
                 string s = "";
                 while ((s = sr.ReadLine()) != null)
                 {
-                        // assuming that your date is in the first line of the file
-                        if (DateTime.TryParse(s, out DateTime lastBackupDateTime))
-                        {
-                            lastBackupLabel.Text = $"Last backup: {lastBackupDateTime:d.M.yyyy H:mm}";
-                        }
-                        else
-                        {
-                            lastBackupLabel.Text = "Last successful backup: Date format is incorrect";
-                        }
-                        break;
+                    // assuming that your date is in the first line of the file
+                    if (DateTime.TryParse(s, out DateTime lastBackupDateTime))
+                    {
+                        lastBackupLabel.Text = $"Last backup: {lastBackupDateTime:d.M.yyyy H:mm}";
+                    }
+                    else
+                    {
+                        lastBackupLabel.Text = "Last successful backup: Date format is incorrect";
+                    }
+                    break;
                 }
             }
         }
@@ -467,16 +467,16 @@ class SettingsForm : Form
                 string s = "";
                 while ((s = sr.ReadLine()) != null)
                 {
-                        // assuming that your date is in the first line of the file
-                        if (DateTime.TryParse(s, out DateTime lastBackupDateTime))
-                        {
-                            lastSystemImageBackupLabel.Text = $"Last system image backup: {lastBackupDateTime:d.M.yyyy H:mm}";
-                        }
-                        else
-                        {
-                            lastSystemImageBackupLabel.Text = "Last system image backup: Date format is incorrect";
-                        }
-                        break;
+                    // assuming that your date is in the first line of the file
+                    if (DateTime.TryParse(s, out DateTime lastBackupDateTime))
+                    {
+                        lastSystemImageBackupLabel.Text = $"Last system image backup: {lastBackupDateTime:d.M.yyyy H:mm}";
+                    }
+                    else
+                    {
+                        lastSystemImageBackupLabel.Text = "Last system image backup: Date format is incorrect";
+                    }
+                    break;
                 }
             }
         }
@@ -548,9 +548,9 @@ class SettingsForm : Form
         if (File.Exists(settingsIniPath))
         {
             var lines = File.ReadAllLines(settingsIniPath);
-            foreach(var line in lines)
+            foreach (var line in lines)
             {
-                if(line.StartsWith("systemimagedestination="))
+                if (line.StartsWith("systemimagedestination="))
                 {
                     destination = line.Substring("systemimagedestination=".Length).Trim();
                     break;
@@ -637,7 +637,7 @@ class SettingsForm : Form
         {
             MessageBox.Show("The path does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-    }    
+    }
 }
 
 public class FolderArchiver
@@ -646,9 +646,9 @@ public class FolderArchiver
     private string destinationPath;
     private const string LogFilePath = "archive_err.log";
 
-    public FolderArchiver(Label statusLabel)
-    {
-        this.statusLabel = statusLabel;
+    public FolderArchiver(Label statusLabel=null)
+    {        
+        this.statusLabel = statusLabel;        
         ReadConfig();
     }
 
@@ -674,11 +674,13 @@ public class FolderArchiver
         catch (Exception ex)
         {
             LogError($"Error reading config file: {ex.Message}");
-            UpdateStatusLabel($"Error reading config file: {ex.Message}");
+            if (statusLabel != null){
+                UpdateStatusLabel($"Error reading config file: {ex.Message}");
+            }
         }
     }
 
-    public void ArchiveFolders()
+    public void ArchiveFolders(bool prompt = true)
     {
         try
         {
@@ -689,7 +691,7 @@ public class FolderArchiver
             foreach (var folder in folders)
             {
                 currentFolderIndex++; // Increment the current folder index at the start of each loop iteration for percentage display
-                
+
                 if (Directory.Exists(folder))
                 {
                     // Calculate the total size of the files in the folder
@@ -699,7 +701,7 @@ public class FolderArchiver
                     double totalSizeGB = totalSize / (1024.0 * 1024.0 * 1024.0);
 
                     // Check if total size exceeds 1GB
-                    if (totalSizeGB > 1)
+                    if (totalSizeGB > 1 && prompt)
                     {
                         var result = MessageBox.Show($"The folder {folder} is larger than 1GB ({totalSizeGB:N2} GB). Do you want to continue? Choose No to skip this folder.", "Warning", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
 
@@ -718,8 +720,10 @@ public class FolderArchiver
                     }
 
                     // Display status of completion
-                    UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
-
+                    if (prompt)
+                    { // Only display the status if the prompt is shown (not when the process is run in the background}
+                        UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
+                    }
                     string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
                     string zipFileName = $"{baseFileName} V1.zip";
                     int version = 1;
@@ -733,13 +737,19 @@ public class FolderArchiver
                     var zipFilePath = Path.Combine(destinationPath, zipFileName);
 
                     ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
+                    if (prompt)
+                    { // Only display the status if the prompt is shown (not when the process is run in the background}
                     UpdateStatusLabel($"Completed: {folder}");
+                    }
                 }
                 else
                 {
+                    if (prompt)
+                    { // Only display the status if the prompt is shown (not when the process is run in the background}
                     MessageBox.Show($"Folder not found: {folder}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    LogError($"Folder not found: {folder}");
                     UpdateStatusLabel($"Error: Folder not found - {folder}");
+                    }
+                    LogError($"Folder not found: {folder}");
                 }
             }
             UpdateStatusLabel("Archiving Complete");
@@ -747,8 +757,11 @@ public class FolderArchiver
         catch (Exception ex)
         {
             LogError($"Error during archiving: {ex.Message}");
+            if (prompt)
+            { // Only display the status if the prompt is shown (not when the process is run in the background}
             MessageBox.Show($"Error during archiving: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             UpdateStatusLabel("Error during archiving");
+            }
         }
     }
 

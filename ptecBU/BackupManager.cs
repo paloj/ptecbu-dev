@@ -54,13 +54,13 @@ public class BackupManager
         }
 
         // Load folders to backup
-        string[] folders = File.Exists(folderSource) 
-            ? File.ReadAllLines(folderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() 
+        string[] folders = File.Exists(folderSource)
+            ? File.ReadAllLines(folderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
             : new string[0];
 
         // Load excluded items list
-        string[] excludedItems = File.Exists(excludeSource) 
-            ? File.ReadAllLines(excludeSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() 
+        string[] excludedItems = File.Exists(excludeSource)
+            ? File.ReadAllLines(excludeSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
             : new string[0];
 
         // Update tray icon tooltip to "Backup in progress"
@@ -165,9 +165,9 @@ public class BackupManager
                 string mtValue = ReadMTValueFromConfig();
 
                 // Build robocopy command
-                string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i+1}.log {excludeParams} /A-:SH";
+                string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i + 1}.log {excludeParams} /A-:SH";
                 File.WriteAllText("robocopyArgs.txt", robocopyArgs.ToString());
-                
+
                 // Run robocopy
                 ProcessStartInfo psiRobocopy = new ProcessStartInfo("robocopy.exe", robocopyArgs);
                 psiRobocopy.CreateNoWindow = true;
@@ -200,16 +200,16 @@ public class BackupManager
                 if (pRobocopy.ExitCode <= 7) // robocopy exit codes 0-7 are considered successful
                 {
                     try
-                    {                    
-                    // Command to remove hidden and system attributes
-                    string attribArgs = $"-s -h \"{folderDestination}\"";
-                    ProcessStartInfo psiAttrib = new ProcessStartInfo("attrib.exe", attribArgs)
                     {
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    };
-                    Process pAttrib = Process.Start(psiAttrib);
-                    pAttrib.WaitForExit();
+                        // Command to remove hidden and system attributes
+                        string attribArgs = $"-s -h \"{folderDestination}\"";
+                        ProcessStartInfo psiAttrib = new ProcessStartInfo("attrib.exe", attribArgs)
+                        {
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        };
+                        Process pAttrib = Process.Start(psiAttrib);
+                        pAttrib.WaitForExit();
                     }
                     catch (Exception ex)
                     {
@@ -243,9 +243,17 @@ public class BackupManager
 
         }
 
-        if(exitAfter)
+        if (exitAfter)
         {
             Application.Exit();
+        }
+
+        // Add zip to backup if enabled in config.ini
+        if (IsZipInBackupEnabled())
+        {
+            // Call the zip function from SettignsForm.cs
+            var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class
+            Task.Run(() => archiver.ArchiveFolders(false));     // Run the archiver in a separate thread
         }
 
         // Stop blinking tray icon
@@ -276,7 +284,7 @@ public class BackupManager
     {
         string configPath = "config.ini";
         string backupKey = "twobackups=";
-        
+
         if (File.Exists(configPath))
         {
             string[] configLines = File.ReadAllLines(configPath);
@@ -288,11 +296,33 @@ public class BackupManager
                 return backupValue == "true";
             }
         }
-        
+
         // Return false as default if the config file or twobackups setting does not exist
         return false;
     }
 
+    private static bool IsZipInBackupEnabled()  // Check if the includeZipInBackup setting is enabled in config.ini
+    {
+        string configPath = "config.ini";
+        string zipKey = "includeZipInBackup="; // Key to look for in the config file
+
+        if (File.Exists(configPath))
+        {
+            string[] configLines = File.ReadAllLines(configPath);
+            // Find the first line that starts with the zipKey, ignoring case
+            string zipLine = configLines.FirstOrDefault(line => line.StartsWith(zipKey, StringComparison.OrdinalIgnoreCase));
+
+            if (zipLine != null)
+            {
+                // Extract the value part after the '=' and trim any whitespace, then compare it with "true"
+                string zipValue = zipLine.Substring(zipKey.Length).Trim().ToLower();
+                return zipValue == "true"; // Return true if the setting's value is "true"
+            }
+        }
+
+        // Return false as default if the config file does not exist or the includeZipInBackup setting is not found or not set to true
+        return false;
+    }
     public static class PathValidator
     {
         public static bool IsValidPath(string path)
@@ -393,27 +423,27 @@ public class BackupManager
         return DateTime.Now - lastBackup > TimeSpan.FromDays(30);
     }
 
-/* USING DEFINED HOURS FROM CONFIG.INI INSTEAD OF HARDCODED 1 DAY.
-    public static bool IsLastBackupOlderThanOneDay()
-    {
-        if (!File.Exists("lastBackup.txt"))
+    /* USING DEFINED HOURS FROM CONFIG.INI INSTEAD OF HARDCODED 1 DAY.
+        public static bool IsLastBackupOlderThanOneDay()
         {
-            // If the file doesn't exist, assume the last backup was more than a day ago
-            return true;
-        }
+            if (!File.Exists("lastBackup.txt"))
+            {
+                // If the file doesn't exist, assume the last backup was more than a day ago
+                return true;
+            }
 
-        string timestampStr = File.ReadAllText("lastBackup.txt");
-        DateTime lastBackup;
-        if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
-        {
-            // If the timestamp can't be parsed, assume the last backup was more than a day ago
-            return true;
-        }
+            string timestampStr = File.ReadAllText("lastBackup.txt");
+            DateTime lastBackup;
+            if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
+            {
+                // If the timestamp can't be parsed, assume the last backup was more than a day ago
+                return true;
+            }
 
-        // Check if the last backup was more than a day ago
-        return DateTime.Now - lastBackup > TimeSpan.FromDays(1);
-    }
-*/
+            // Check if the last backup was more than a day ago
+            return DateTime.Now - lastBackup > TimeSpan.FromDays(1);
+        }
+    */
     public static bool IsLastBackupOlderThanConfigHours() // Check if the last backup was older than the defined hours in config.ini
     {
         string[] lines = File.ReadAllLines("config.ini");
@@ -479,7 +509,7 @@ public class BackupManager
             {
                 Directory.CreateDirectory(directory);
             }
-            
+
             // Try to write an empty file
             File.WriteAllText(testFilePath, string.Empty);
 
