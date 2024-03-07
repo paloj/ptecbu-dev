@@ -18,6 +18,8 @@ class SettingsForm : Form
     private Button addExcludedItemButton;
     private Button removeExcludedItemButton;
     private CheckBox launchOnStartupCheckBox;
+    private CheckBox includeZipInBackupCheckBox;
+    private CheckBox onlyMakeZipBackupCheckBox;
     private Button closeButton;
     private Label lastBackupLabel;
     private Label backupDestinationLabel;
@@ -256,6 +258,37 @@ class SettingsForm : Form
                     launchOnStartupCheckBox.Checked = false;
                 }
             }
+        }
+
+        // CheckBox for including zip in backup
+        includeZipInBackupCheckBox = new CheckBox
+        {
+            Location = new Point(350, 310), // Adjust as needed
+            Text = "Include Zip in Backup",
+            AutoSize = true
+        };
+        includeZipInBackupCheckBox.CheckedChanged += IncludeZipInBackupCheckBox_CheckedChanged;
+        Controls.Add(includeZipInBackupCheckBox);
+        // Read the value from the config.ini file and set the checkbox accordingly
+        var config = ReadConfigIni("config.ini");
+        if (config.TryGetValue("includeZipInBackup", out string includeZipInBackupValue))
+        {
+            includeZipInBackupCheckBox.Checked = includeZipInBackupValue.ToLower() == "true";
+        }
+
+        // CheckBox for only make zip backup
+        onlyMakeZipBackupCheckBox = new CheckBox
+        {
+            Location = new Point(350, 340), // Adjust as needed
+            Text = "Only Make Zip Backup",
+            AutoSize = true
+        };
+        onlyMakeZipBackupCheckBox.CheckedChanged += OnlyMakeZipBackupCheckBox_CheckedChanged;
+        Controls.Add(onlyMakeZipBackupCheckBox);
+        // Read the value from the config.ini file and set the checkbox accordingly
+        if (config.TryGetValue("onlyMakeZipBackup", out string onlyMakeZipBackupValue))
+        {
+            onlyMakeZipBackupCheckBox.Checked = onlyMakeZipBackupValue.ToLower() == "true";
         }
 
         // Create the Close button
@@ -603,6 +636,94 @@ class SettingsForm : Form
     {
         UpdateRegistryForStartup();
     }
+
+    private void IncludeZipInBackupCheckBox_CheckedChanged(object sender, EventArgs e)
+    {
+        // Update config.ini with the new value
+        UpdateConfigIni("includeZipInBackup", includeZipInBackupCheckBox.Checked ? "true" : "false");
+    }
+
+    private void OnlyMakeZipBackupCheckBox_CheckedChanged(object sender, EventArgs e)
+    {
+        // Update config.ini with the new value
+        UpdateConfigIni("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
+    }
+
+    private Dictionary<string, string> ReadConfigIni(string filePath)
+    {
+        var config = new Dictionary<string, string>();
+
+        // Check if the file exists to avoid FileNotFoundException
+        if (File.Exists(filePath))
+        {
+            var lines = File.ReadAllLines(filePath);
+            foreach (var line in lines)
+            {
+                // Skip empty lines and comments
+                if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith(";"))
+                {
+                    var parts = line.Split('=', 2); // Split the line into key and value
+                    if (parts.Length == 2)
+                    {
+                        var key = parts[0].Trim();
+                        var value = parts[1].Trim();
+                        config[key] = value;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Optionally, log the error or throw an exception if the file is not found
+            Console.WriteLine($"Configuration file not found: {filePath}");
+        }
+
+        return config;
+    }
+
+
+    private void UpdateConfigIni(string key, string value)
+    {
+        // Define the path to the config.ini file
+        string filePath = "config.ini";
+
+        // Check if the config file exists
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine("Config file not found.");
+            return;
+        }
+
+        // Read all lines from the config file
+        var lines = File.ReadAllLines(filePath).ToList();
+
+        // Flag to check if key is found and updated
+        bool keyFound = false;
+
+        // Go through each line to find and update the key
+        for (int i = 0; i < lines.Count; i++)
+        {
+            // Check if the line contains the key (ignoring comment lines)
+            if (!lines[i].TrimStart().StartsWith("//") && lines[i].Contains(key))
+            {
+                // Replace the line with the new key-value pair
+                lines[i] = $"{key}={value}";
+                keyFound = true;
+                break; // Exit the loop since the key has been found and updated
+            }
+        }
+
+        // If the key wasn't found in the existing lines, add it as a new entry
+        if (!keyFound)
+        {
+            lines.Add($"{key}={value}");
+        }
+
+        // Write the updated lines back to the config file
+        File.WriteAllLines(filePath, lines);
+    }
+
+
 
     private void CheckUpdatesButton_Click(object sender, EventArgs e)
     {

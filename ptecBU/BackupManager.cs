@@ -43,223 +43,236 @@ public class BackupManager
 
     public static void PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
     {
-        // Use the customDestination if provided, otherwise use the default destination
-        // Append the hostname to the customDestination before using it
-        string destination = customDestination != null ? Path.Combine(customDestination, hostname) : Destination;
+        // Start blinking tray icon to indicate backup is in progress
+        BlinkTrayIcon(true);
 
-        // Check if the backup location is reachable
-        if (!IsBackupLocationReachable(destination))
+        // If onlyMakeZipBackup is true, perform only the zip backup and skip robocopy
+        if (IsOnlyMakeZipBackupEnabled())
         {
-            MessageBox.Show($"PtecBU: Destination {destination} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        // Load folders to backup
-        string[] folders = File.Exists(folderSource)
-            ? File.ReadAllLines(folderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
-            : new string[0];
-
-        // Load excluded items list
-        string[] excludedItems = File.Exists(excludeSource)
-            ? File.ReadAllLines(excludeSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
-            : new string[0];
-
-        // Update tray icon tooltip to "Backup in progress"
-        if (!Program.IsRunningWithArguments)
-        {
-            // Start blinking tray icon
-            BlinkTrayIcon(true);
-            Program.trayIcon.Text = "Backup in progress";
-        }
-
-        // Generate exclusion parameters for robocopy
-        // Lists to hold excluded directories and files
-        List<string> excludedDirs = new List<string>();
-        List<string> excludedFiles = new List<string>();
-
-        foreach (string item in excludedItems)
-        {
-            if (Directory.Exists(item)) // Folder
-            {
-                excludedDirs.Add(item);
-            }
-            else if (File.Exists(item)) // File
-            {
-                excludedFiles.Add(item);
-            }
-            else if (item.StartsWith(@"*") && (item.EndsWith(@"\") || item.EndsWith(@"/"))) // Folder with wildcard
-            {
-                Match match = Regex.Match(item, @"[^*\\/]+");
-                if (match.Success)
-                {
-                    excludedDirs.Add(match.Value);
-                }
-            }
-            else // Assume file extension
-            {
-                excludedFiles.Add(item);
-            }
-        }
-
-        // Generate exclusion parameters for robocopy
-        string excludeDirsParams = excludedDirs.Count > 0 ? $"/XD {string.Join(" ", excludedDirs.Select(d => $"\"{d}\""))} " : "";
-        string excludeFilesParams = excludedFiles.Count > 0 ? $"/XF {string.Join(" ", excludedFiles.Select(f => $"\"{f}\""))} " : "";
-
-        string excludeParams = excludeDirsParams + excludeFilesParams;
-
-        bool isTwoBackupsEnabled = IsTwoBackupsEnabled();
-        string destinationSuffix = "";
-
-        if (isTwoBackupsEnabled)
-        {
-            // Decide the backup folder suffix (_1 or _2) based on the current day of the month
-            int currentDayOfMonth = DateTime.Now.Day;
-            destinationSuffix = currentDayOfMonth <= 15 ? "_1" : "_2";
+            var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
+            Task.Run(() => archiver.ArchiveFolders(false)); // Run the zip archive process in a separate thread
         }
         else
         {
-            destinationSuffix = "_1"; // Always use the "_1" suffix if twobackups is disabled
-        }
+            //CONTINUE WITH ROBOCOPY BACKUP
 
-        // Method to generate a short hash for a given folder path
-        static string GenerateShortHash(string folderPath)
-        {
-            byte[] hashBytes = SHA1.HashData(Encoding.UTF8.GetBytes(folderPath));
-            // Convert the first 4 bytes of the hash to a hexadecimal string for a shorter identifier
-            string shortHash = BitConverter.ToString(hashBytes, 0, 4).Replace("-", "").ToLower();
-            return shortHash;
-        }
+            // Use the customDestination if provided, otherwise use the default destination
+            // Append the hostname to the customDestination before using it
+            string destination = customDestination != null ? Path.Combine(customDestination, hostname) : Destination;
 
-        // Perform backup for each folder
-        for (int i = 0; i < folders.Length; i++)
-        {
-            // Get the source folder
-            // Normalize the folder path
-            string folder = folders[i].TrimEnd('\\');
-
-            // Determine if the source is a drive root
-            bool isDriveRoot = Path.GetPathRoot(folder).Equals(folder, StringComparison.OrdinalIgnoreCase);
-
-            string folderNameForDestination;
-            if (isDriveRoot)
+            // Check if the backup location is reachable
+            if (!IsBackupLocationReachable(destination))
             {
-                folderNameForDestination = $"{folder.Replace(":", "")}_drive";
+                MessageBox.Show($"PtecBU: Destination {destination} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Load folders to backup
+            string[] folders = File.Exists(folderSource)
+                ? File.ReadAllLines(folderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                : new string[0];
+
+            // Load excluded items list
+            string[] excludedItems = File.Exists(excludeSource)
+                ? File.ReadAllLines(excludeSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+                : new string[0];
+
+            // Update tray icon tooltip to "Backup in progress"
+            if (!Program.IsRunningWithArguments)
+            {
+                // Start blinking tray icon
+                BlinkTrayIcon(true);
+                Program.trayIcon.Text = "Backup in progress";
+            }
+
+            // Generate exclusion parameters for robocopy
+            // Lists to hold excluded directories and files
+            List<string> excludedDirs = new List<string>();
+            List<string> excludedFiles = new List<string>();
+
+            foreach (string item in excludedItems)
+            {
+                if (Directory.Exists(item)) // Folder
+                {
+                    excludedDirs.Add(item);
+                }
+                else if (File.Exists(item)) // File
+                {
+                    excludedFiles.Add(item);
+                }
+                else if (item.StartsWith(@"*") && (item.EndsWith(@"\") || item.EndsWith(@"/"))) // Folder with wildcard
+                {
+                    Match match = Regex.Match(item, @"[^*\\/]+");
+                    if (match.Success)
+                    {
+                        excludedDirs.Add(match.Value);
+                    }
+                }
+                else // Assume file extension
+                {
+                    excludedFiles.Add(item);
+                }
+            }
+
+            // Generate exclusion parameters for robocopy
+            string excludeDirsParams = excludedDirs.Count > 0 ? $"/XD {string.Join(" ", excludedDirs.Select(d => $"\"{d}\""))} " : "";
+            string excludeFilesParams = excludedFiles.Count > 0 ? $"/XF {string.Join(" ", excludedFiles.Select(f => $"\"{f}\""))} " : "";
+
+            string excludeParams = excludeDirsParams + excludeFilesParams;
+
+            bool isTwoBackupsEnabled = IsTwoBackupsEnabled();
+            string destinationSuffix = "";
+
+            if (isTwoBackupsEnabled)
+            {
+                // Decide the backup folder suffix (_1 or _2) based on the current day of the month
+                int currentDayOfMonth = DateTime.Now.Day;
+                destinationSuffix = currentDayOfMonth <= 15 ? "_1" : "_2";
             }
             else
             {
-                // Use the last folder name and append a short hash
-                string shortHash = GenerateShortHash(folder);
-                folderNameForDestination = $"{Path.GetFileName(folder)}_{shortHash}";
+                destinationSuffix = "_1"; // Always use the "_1" suffix if twobackups is disabled
             }
 
-            // Build the destination path
-            string folderDestination = Path.Combine(destination, folderNameForDestination + destinationSuffix);
-
-            // Validate the folderDestination path
-            if (PathValidator.IsValidPath(folderDestination))
+            // Method to generate a short hash for a given folder path
+            static string GenerateShortHash(string folderPath)
             {
-                // Remove trailing backslash from source and destination
-                folder = folder.TrimEnd('\\');
-                folderDestination = folderDestination.TrimEnd('\\');
+                byte[] hashBytes = SHA1.HashData(Encoding.UTF8.GetBytes(folderPath));
+                // Convert the first 4 bytes of the hash to a hexadecimal string for a shorter identifier
+                string shortHash = BitConverter.ToString(hashBytes, 0, 4).Replace("-", "").ToLower();
+                return shortHash;
+            }
 
-                // Read MT value from config.ini
-                string mtValue = ReadMTValueFromConfig();
+            // Perform backup for each folder
+            for (int i = 0; i < folders.Length; i++)
+            {
+                // Get the source folder
+                // Normalize the folder path
+                string folder = folders[i].TrimEnd('\\');
 
-                // Build robocopy command
-                string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i + 1}.log {excludeParams} /A-:SH";
-                File.WriteAllText("robocopyArgs.txt", robocopyArgs.ToString());
+                // Determine if the source is a drive root
+                bool isDriveRoot = Path.GetPathRoot(folder).Equals(folder, StringComparison.OrdinalIgnoreCase);
 
-                // Run robocopy
-                ProcessStartInfo psiRobocopy = new ProcessStartInfo("robocopy.exe", robocopyArgs);
-                psiRobocopy.CreateNoWindow = true;
-                psiRobocopy.UseShellExecute = false;
-                psiRobocopy.RedirectStandardError = true;  // Add this line to redirect standard error
-                Process pRobocopy = Process.Start(psiRobocopy);
-
-                // Capture the standard error output
-                string errorOutput = pRobocopy.StandardError.ReadToEnd();
-
-                pRobocopy.WaitForExit();
-
-                if (!File.Exists("backup.log"))
+                string folderNameForDestination;
+                if (isDriveRoot)
                 {
-                    File.WriteAllText("backup.log", "Error:" + DateTime.Now.ToString("o"));
-                }
-
-                string logContents = File.ReadAllText("backup.log");
-
-                if (logContents.Contains("ERROR 112"))
-                {
-                    // Write current timestamp to file
-                    File.WriteAllText("lastFail.txt", DateTime.Now.ToString("o"));
-
-                    // Show a popup warning that the destination is full
-                    MessageBox.Show("Destination drive is full. Backup operation could not be completed.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-
-                // Check if robocopy was successful
-                if (pRobocopy.ExitCode <= 7) // robocopy exit codes 0-7 are considered successful
-                {
-                    try
-                    {
-                        // Command to remove hidden and system attributes
-                        string attribArgs = $"-s -h \"{folderDestination}\"";
-                        ProcessStartInfo psiAttrib = new ProcessStartInfo("attrib.exe", attribArgs)
-                        {
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        };
-                        Process pAttrib = Process.Start(psiAttrib);
-                        pAttrib.WaitForExit();
-                    }
-                    catch (Exception ex)
-                    {
-                        // Write current timestamp and error to file
-                        File.WriteAllText("attribFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {ex}");
-                    }
-
-                    // Write current timestamp to file
-                    File.WriteAllText("lastBackup.txt", DateTime.Now.ToString("o"));
+                    folderNameForDestination = $"{folder.Replace(":", "")}_drive";
                 }
                 else
                 {
-                    // Write current timestamp and exit code to file
-                    File.WriteAllText("lastFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {pRobocopy.ExitCode}");
+                    // Use the last folder name and append a short hash
+                    string shortHash = GenerateShortHash(folder);
+                    folderNameForDestination = $"{Path.GetFileName(folder)}_{shortHash}";
+                }
 
-                    // Show a popup warning that the backup operation failed
-                    MessageBox.Show($"Backup operation failed with exit code {pRobocopy.ExitCode}.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Build the destination path
+                string folderDestination = Path.Combine(destination, folderNameForDestination + destinationSuffix);
 
-                    if (pRobocopy.ExitCode == 12) // robocopy exit code 12 indicates destination full
+                // Validate the folderDestination path
+                if (PathValidator.IsValidPath(folderDestination))
+                {
+                    // Remove trailing backslash from source and destination
+                    folder = folder.TrimEnd('\\');
+                    folderDestination = folderDestination.TrimEnd('\\');
+
+                    // Read MT value from config.ini
+                    string mtValue = ReadMTValueFromConfig();
+
+                    // Build robocopy command
+                    string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i + 1}.log {excludeParams} /A-:SH";
+                    File.WriteAllText("robocopyArgs.txt", robocopyArgs.ToString());
+
+                    // Run robocopy
+                    ProcessStartInfo psiRobocopy = new ProcessStartInfo("robocopy.exe", robocopyArgs);
+                    psiRobocopy.CreateNoWindow = true;
+                    psiRobocopy.UseShellExecute = false;
+                    psiRobocopy.RedirectStandardError = true;  // Add this line to redirect standard error
+                    Process pRobocopy = Process.Start(psiRobocopy);
+
+                    // Capture the standard error output
+                    string errorOutput = pRobocopy.StandardError.ReadToEnd();
+
+                    pRobocopy.WaitForExit();
+
+                    if (!File.Exists("backup.log"))
                     {
+                        File.WriteAllText("backup.log", "Error:" + DateTime.Now.ToString("o"));
+                    }
+
+                    string logContents = File.ReadAllText("backup.log");
+
+                    if (logContents.Contains("ERROR 112"))
+                    {
+                        // Write current timestamp to file
+                        File.WriteAllText("lastFail.txt", DateTime.Now.ToString("o"));
+
                         // Show a popup warning that the destination is full
                         MessageBox.Show("Destination drive is full. Backup operation could not be completed.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
+
+                    // Check if robocopy was successful
+                    if (pRobocopy.ExitCode <= 7) // robocopy exit codes 0-7 are considered successful
+                    {
+                        try
+                        {
+                            // Command to remove hidden and system attributes
+                            string attribArgs = $"-s -h \"{folderDestination}\"";
+                            ProcessStartInfo psiAttrib = new ProcessStartInfo("attrib.exe", attribArgs)
+                            {
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            };
+                            Process pAttrib = Process.Start(psiAttrib);
+                            pAttrib.WaitForExit();
+                        }
+                        catch (Exception ex)
+                        {
+                            // Write current timestamp and error to file
+                            File.WriteAllText("attribFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {ex}");
+                        }
+
+                        // Write current timestamp to file
+                        File.WriteAllText("lastBackup.txt", DateTime.Now.ToString("o"));
+                    }
+                    else
+                    {
+                        // Write current timestamp and exit code to file
+                        File.WriteAllText("lastFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {pRobocopy.ExitCode}");
+
+                        // Show a popup warning that the backup operation failed
+                        MessageBox.Show($"Backup operation failed with exit code {pRobocopy.ExitCode}.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                        if (pRobocopy.ExitCode == 12) // robocopy exit code 12 indicates destination full
+                        {
+                            // Show a popup warning that the destination is full
+                            MessageBox.Show("Destination drive is full. Backup operation could not be completed.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
                 }
-            }
-            else
-            {
-                // Write current timestamp to file
-                File.WriteAllText("lastFail.txt", DateTime.Now.ToString("o"));
+                else
+                {
+                    // Write current timestamp to file
+                    File.WriteAllText("lastFail.txt", DateTime.Now.ToString("o"));
+                }
+
             }
 
+            // Add zip to backup if enabled in config.ini
+            if (IsZipInBackupEnabled())
+            {
+                // Call the zip function from SettignsForm.cs
+                var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class
+                Task.Run(() => archiver.ArchiveFolders(false));     // Run the archiver in a separate thread
+            }
         }
+
+        // Stop blinking tray icon
+        BlinkTrayIcon(false);
 
         if (exitAfter)
         {
             Application.Exit();
         }
-
-        // Add zip to backup if enabled in config.ini
-        //if (IsZipInBackupEnabled())
-        if (true)
-        {
-            // Call the zip function from SettignsForm.cs
-            var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class
-            Task.Run(() => archiver.ArchiveFolders(false));     // Run the archiver in a separate thread
-        }
-
-        // Stop blinking tray icon
-        BlinkTrayIcon(false);
 
         // Update tray icon tooltip after backup completion
         Program.UpdateTrayIconTooltip();
@@ -325,6 +338,24 @@ public class BackupManager
         // Return false as default if the config file does not exist or the includeZipInBackup setting is not found or not set to true
         return false;
     }
+
+    private static bool IsOnlyMakeZipBackupEnabled()    // Check if the onlyMakeZipBackup setting is enabled in config.ini
+    {
+        string configPath = "config.ini";
+        string onlyMakeZipBackupKey = "onlyMakeZipBackup=";
+        if (File.Exists(configPath))
+        {
+            var configLines = File.ReadAllLines(configPath);
+            var onlyMakeZipBackupLine = configLines.FirstOrDefault(line => line.StartsWith(onlyMakeZipBackupKey, StringComparison.OrdinalIgnoreCase));
+            if (onlyMakeZipBackupLine != null)
+            {
+                var onlyMakeZipBackupValue = onlyMakeZipBackupLine.Substring(onlyMakeZipBackupKey.Length).Trim().ToLower();
+                return onlyMakeZipBackupValue == "true";
+            }
+        }
+        return false; // Return false by default if the setting is not found or not true
+    }
+
     public static class PathValidator
     {
         public static bool IsValidPath(string path)

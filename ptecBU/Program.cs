@@ -5,6 +5,7 @@ using System.IO;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 static class Program
 {
@@ -17,9 +18,12 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        SystemEvents.SessionSwitch += new SessionSwitchEventHandler(SystemEvents_SessionSwitch);
+        Application.ApplicationExit += new EventHandler(Application_ApplicationExit);
+
         string APP_PATH = Application.ExecutablePath.ToString();
         Environment.CurrentDirectory = Path.GetDirectoryName(APP_PATH);
-        
+
         //Variable to tell the backupmanager if program is started with arguments. then no trayicon actions
         IsRunningWithArguments = args.Length > 0;
 
@@ -37,16 +41,16 @@ static class Program
 
         // Check that custom foldersource and excludeitemlist exist
         if (!File.Exists(FolderSource))
-            {
-                MessageBox.Show($"PtecBU: Backup folder list {FolderSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                Application.Exit();
-            }
+        {
+            MessageBox.Show($"PtecBU: Backup folder list {FolderSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Application.Exit();
+        }
 
         if (!File.Exists(ExcludeListSource))
-            {
-                MessageBox.Show($"PtecBU: Exclude items list {ExcludeListSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                Application.Exit();
-            }
+        {
+            MessageBox.Show($"PtecBU: Exclude items list {ExcludeListSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Application.Exit();
+        }
 
         // If -now argument is given then we dont open the tray app. Just do the backup in the background.
         if (args.Contains("-now"))
@@ -105,6 +109,39 @@ static class Program
         }
     }
 
+    private static void Application_ApplicationExit(object sender, EventArgs e)
+    {
+        //Call on exit to remove the eventhandler
+        OnExit(sender, e);
+    }
+
+    private static void SystemEvents_SessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        switch (e.Reason)
+        {
+            // User has logged on or unlocked the session
+            case SessionSwitchReason.SessionLogon:
+            case SessionSwitchReason.SessionUnlock:
+                // Resume the backup timer
+                if (CustomApplicationContext.backupTimer != null && !CustomApplicationContext.backupTimer.Enabled)
+                {
+                    CustomApplicationContext.backupTimer.Start();
+                }
+                break;
+
+            // User has logged off or locked the session
+            case SessionSwitchReason.SessionLogoff:
+            case SessionSwitchReason.SessionLock:
+                // Pause the backup timer
+                if (CustomApplicationContext.backupTimer != null && CustomApplicationContext.backupTimer.Enabled)
+                {
+                    CustomApplicationContext.backupTimer.Stop();
+                }
+                break;
+        }
+    }
+
+
     private static void OnBackupNow(object sender, EventArgs e)
     {
         // Check if "-destination" argument is provided
@@ -144,7 +181,7 @@ static class Program
                     {
                         string lastBackupText = "";
 
-                        if(Program.destinationReachable)
+                        if (Program.destinationReachable)
                         {
                             lastBackupText = $"Last backup: {lastBackupDateTime:d.M.yyyy H:mm}";
                         }
@@ -152,7 +189,7 @@ static class Program
                         {
                             lastBackupText = $"Backup destination unreachable.\nLast backup: {lastBackupDateTime:d.M.yyyy H:mm}";
                         }
-                        
+
                         trayIcon.Text = lastBackupText;
 
                         // Check if the last successful backup was more than a month ago
@@ -181,7 +218,7 @@ static class Program
         else
         {
             string neverBackupText = "Last successful backup: Never";
-            if(!Program.destinationReachable)
+            if (!Program.destinationReachable)
             {
                 neverBackupText = "Backup destination unreachable.\nLast successful backup: Never";
                 // Set the tray icon to red when the destination is not reachable
@@ -208,7 +245,14 @@ static class Program
     private static void OnExit(object sender, EventArgs e)
     {
         // Handle exit clicked
-        Application.ExitThread();
+        // Unsubscribe from the SessionSwitch event
+        SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
+        // Unsubscribe from the ApplicationExit event
+        Application.ApplicationExit -= Application_ApplicationExit;
+        // Dispose of the backup timer
+        CustomApplicationContext.backupTimer?.Dispose();
+        // Exit the application
+        Application.Exit();
     }
 
     private static string GetCustomDestination(string[] args)
@@ -277,7 +321,7 @@ static class Program
 class CustomApplicationContext : ApplicationContext
 {
     private NotifyIcon trayIcon;
-    private System.Windows.Forms.Timer backupTimer;
+    public static System.Windows.Forms.Timer backupTimer; // Make the timer accessible
 
     public CustomApplicationContext(NotifyIcon trayIcon)
     {
@@ -324,7 +368,7 @@ class CustomApplicationContext : ApplicationContext
             {
                 // Check if the last backup was over 24 hours ago and no backup is currently in progress
                 if (BackupManager.IsLastBackupOlderThanConfigHours() && !BackupManager.isBlinking)
-                {   
+                {
                     // Check if a connection to the backup location exists
                     if (BackupManager.IsBackupLocationReachable())
                     {
@@ -344,7 +388,7 @@ class CustomApplicationContext : ApplicationContext
                                 tickDestination = destinationLine.Substring(destinationKey.Length).Trim();
                             }
                         }
-                        
+
                         // Perform backup
                         BackupManager.PerformBackup(tickDestination);
 
@@ -362,13 +406,15 @@ class CustomApplicationContext : ApplicationContext
         }
     }
 
-
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             backupTimer?.Stop();
             backupTimer?.Dispose();
+            // Hide the tray icon, otherwise it will remain shown until the user mouses over it
+            trayIcon.Visible = false;
+            // Dispose of the tray icon
             trayIcon?.Dispose();
         }
         base.Dispose(disposing);
