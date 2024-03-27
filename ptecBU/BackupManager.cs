@@ -44,6 +44,7 @@ public class BackupManager
     public static void PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
     {
         // Start blinking tray icon to indicate backup is in progress
+        Program.IsBackupInProgress = true;
         BlinkTrayIcon(true);
 
         // If onlyMakeZipBackup is true, perform only the zip backup and skip robocopy
@@ -182,17 +183,34 @@ public class BackupManager
                     string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i + 1}.log {excludeParams} /A-:SH";
                     File.WriteAllText("robocopyArgs.txt", robocopyArgs.ToString());
 
+                    // Before starting a new robocopy process, ensure any existing one is properly handled
+                    if (Program.RobocopyProcess != null && !Program.RobocopyProcess.HasExited)
+                    {
+                        Program.RobocopyProcess.Kill();
+                        Program.RobocopyProcess.Dispose();
+                    }
+
                     // Run robocopy
                     ProcessStartInfo psiRobocopy = new ProcessStartInfo("robocopy.exe", robocopyArgs);
                     psiRobocopy.CreateNoWindow = true;
                     psiRobocopy.UseShellExecute = false;
                     psiRobocopy.RedirectStandardError = true;  // Add this line to redirect standard error
-                    Process pRobocopy = Process.Start(psiRobocopy);
 
-                    // Capture the standard error output
-                    string errorOutput = pRobocopy.StandardError.ReadToEnd();
+                    Program.RobocopyProcess = new Process { StartInfo = psiRobocopy };
 
-                    pRobocopy.WaitForExit();
+                    Program.RobocopyProcess.ErrorDataReceived += new DataReceivedEventHandler((sender, e) =>
+                    {
+                        if (!string.IsNullOrEmpty(e.Data))
+                        {
+                            // Handle the error output line e.Data
+                        }
+                    });
+                    Program.RobocopyProcess.Start();
+
+                    // Read standard error output asynchronously
+                    Program.RobocopyProcess.BeginErrorReadLine();
+
+                    Program.RobocopyProcess.WaitForExit();
 
                     if (!File.Exists("backup.log"))
                     {
@@ -211,7 +229,7 @@ public class BackupManager
                     }
 
                     // Check if robocopy was successful
-                    if (pRobocopy.ExitCode <= 7) // robocopy exit codes 0-7 are considered successful
+                    if (Program.RobocopyProcess.ExitCode <= 7) // robocopy exit codes 0-7 are considered successful
                     {
                         try
                         {
@@ -237,12 +255,12 @@ public class BackupManager
                     else
                     {
                         // Write current timestamp and exit code to file
-                        File.WriteAllText("lastFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {pRobocopy.ExitCode}");
+                        File.WriteAllText("lastFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {Program.RobocopyProcess.ExitCode}");
 
                         // Show a popup warning that the backup operation failed
-                        MessageBox.Show($"Backup operation failed with exit code {pRobocopy.ExitCode}.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show($"Backup operation failed with exit code {Program.RobocopyProcess.ExitCode}.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-                        if (pRobocopy.ExitCode == 12) // robocopy exit code 12 indicates destination full
+                        if (Program.RobocopyProcess.ExitCode == 12) // robocopy exit code 12 indicates destination full
                         {
                             // Show a popup warning that the destination is full
                             MessageBox.Show("Destination drive is full. Backup operation could not be completed.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -268,6 +286,7 @@ public class BackupManager
 
         // Stop blinking tray icon
         BlinkTrayIcon(false);
+        Program.IsBackupInProgress = false;
 
         if (exitAfter)
         {

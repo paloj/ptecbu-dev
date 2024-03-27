@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using System.Diagnostics;
 
 static class Program
 {
@@ -13,7 +14,10 @@ static class Program
     public static NotifyIcon trayIcon;
     public static bool destinationReachable;
     public static bool IsRunningWithArguments { get; private set; }
+    public static bool IsBackupInProgress = false;
     public static string TickFolderSource = "folders.txt";
+    public static Process RobocopyProcess;
+
 
     [STAThread]
     static void Main(string[] args)
@@ -43,13 +47,13 @@ static class Program
         if (!File.Exists(FolderSource))
         {
             MessageBox.Show($"PtecBU: Backup folder list {FolderSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            Application.Exit();
+            //Application.Exit();
         }
 
         if (!File.Exists(ExcludeListSource))
         {
             MessageBox.Show($"PtecBU: Exclude items list {ExcludeListSource} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            Application.Exit();
+            //Application.Exit();
         }
 
         // If -now argument is given then we dont open the tray app. Just do the backup in the background.
@@ -141,7 +145,6 @@ static class Program
         }
     }
 
-
     private static void OnBackupNow(object sender, EventArgs e)
     {
         // Check if "-destination" argument is provided
@@ -151,11 +154,63 @@ static class Program
             customDestination = Environment.GetCommandLineArgs()[2];
         }
 
-        // Handle backup now clicked
-        BackupManager.PerformBackup(customDestination);
+        // Start the backup process on a separate thread
+        Task.Run(() =>
+        {
+            BackupManager.PerformBackup(customDestination);
+        });
 
-        UpdateTrayIconTooltip();
+        // Check backup progress state and update UI accordingly
+        // Use 'Invoke' if necessary to ensure thread safety when updating UI elements
+        if (trayIcon.ContextMenuStrip.InvokeRequired)
+        {
+            trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(UpdateTrayIconTooltip));
+            trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(UpdateTrayMenuItem));
+        }
+        else
+        {
+            UpdateTrayIconTooltip();
+            UpdateTrayMenuItem();
+        }
     }
+
+    private static void OnCancelBackup(object sender, EventArgs e)
+    {
+        if (Program.RobocopyProcess != null && !Program.RobocopyProcess.HasExited)
+        {
+            Program.RobocopyProcess.Kill();
+            Program.RobocopyProcess.Dispose();
+            Program.RobocopyProcess = null;
+        }
+
+        // Reset backup status and update tray menu as necessary
+        IsBackupInProgress = false;
+        UpdateTrayMenuItem();
+    }
+
+    public static void UpdateTrayMenuItem()
+    {
+        // Assuming 'trayIcon' is your NotifyIcon and it has a ContextMenuStrip assigned
+        var backupMenuItem = trayIcon.ContextMenuStrip.Items.Cast<ToolStripMenuItem>().FirstOrDefault(item => item.Text == "Backup now" || item.Text == "Cancel backup");
+
+        if (backupMenuItem != null)
+        {
+            if (IsBackupInProgress)
+            {
+                backupMenuItem.Text = "Cancel backup";
+                backupMenuItem.Click -= OnBackupNow; // Make sure to remove the previous event handler
+                backupMenuItem.Click += OnCancelBackup; // Add the new event handler
+            }
+            else
+            {
+                backupMenuItem.Text = "Backup now";
+                backupMenuItem.Click -= OnCancelBackup; // Remove the cancel event handler
+                backupMenuItem.Click += OnBackupNow; // Add the backup event handler
+            }
+        }
+    }
+
+
     public static void UpdateTrayIconTooltip()
     {
         string filePath = "lastBackup.txt"; // replace with your path
@@ -227,7 +282,7 @@ static class Program
             else
             {
                 // Optionally set a different text when the destination is reachable
-                neverBackupText = "Backup destination reachable.\nLast successful backup: [Your Date Here]";
+                neverBackupText = "Backup destination reachable.\nLast successful backup: Never";
                 // Set the tray icon to white (or another icon) when the destination is reachable
                 trayIcon.Icon = new Icon("Resources/white.ico");
             }
@@ -245,6 +300,13 @@ static class Program
     private static void OnExit(object sender, EventArgs e)
     {
         // Handle exit clicked
+        // Check if the RobocopyProcess exists and is running
+        if (Program.RobocopyProcess != null && !Program.RobocopyProcess.HasExited)
+        {
+            Program.RobocopyProcess.Kill();
+            Program.RobocopyProcess.Dispose(); // Dispose of the process object
+        }
+
         // Unsubscribe from the SessionSwitch event
         SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
         // Unsubscribe from the ApplicationExit event
@@ -376,7 +438,7 @@ class CustomApplicationContext : ApplicationContext
 
                         string configPath = "config.ini";
                         string destinationKey = "destination=";
-                        string tickDestination = @"\\TRUENAS\backup\";
+                        string tickDestination = @"\\127.0.0.1\backup\";
 
                         if (File.Exists(configPath))
                         {
@@ -389,11 +451,13 @@ class CustomApplicationContext : ApplicationContext
                             }
                         }
 
-                        // Perform backup
-                        BackupManager.PerformBackup(tickDestination);
-
-                        // Update tray icon tooltip text after backup
+                        // Start the backup process on a separate thread
+                        Task.Run(() =>
+                        {
+                            BackupManager.PerformBackup(tickDestination);
+                        });
                         Program.UpdateTrayIconTooltip();
+                        Program.UpdateTrayMenuItem();
                     }
                     else
                     {
