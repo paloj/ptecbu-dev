@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net;
 using System.Windows.Forms;
 using System.Drawing;
@@ -270,7 +271,7 @@ class SettingsForm : Form
         includeZipInBackupCheckBox.CheckedChanged += IncludeZipInBackupCheckBox_CheckedChanged;
         Controls.Add(includeZipInBackupCheckBox);
         // Read the value from the config.ini file and set the checkbox accordingly
-        var config = ReadConfigIni("config.ini");
+        var config = AppConfigManager.ReadConfigIni("config.ini");
         if (config.TryGetValue("includeZipInBackup", out string includeZipInBackupValue))
         {
             includeZipInBackupCheckBox.Checked = includeZipInBackupValue.ToLower() == "true";
@@ -649,39 +650,6 @@ class SettingsForm : Form
         UpdateConfigIni("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
     }
 
-    private Dictionary<string, string> ReadConfigIni(string filePath)
-    {
-        var config = new Dictionary<string, string>();
-
-        // Check if the file exists to avoid FileNotFoundException
-        if (File.Exists(filePath))
-        {
-            var lines = File.ReadAllLines(filePath);
-            foreach (var line in lines)
-            {
-                // Skip empty lines and comments
-                if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith(";"))
-                {
-                    var parts = line.Split('=', 2); // Split the line into key and value
-                    if (parts.Length == 2)
-                    {
-                        var key = parts[0].Trim();
-                        var value = parts[1].Trim();
-                        config[key] = value;
-                    }
-                }
-            }
-        }
-        else
-        {
-            // Optionally, log the error or throw an exception if the file is not found
-            Console.WriteLine($"Configuration file not found: {filePath}");
-        }
-
-        return config;
-    }
-
-
     private void UpdateConfigIni(string key, string value)
     {
         // Define the path to the config.ini file
@@ -816,55 +784,63 @@ public class FolderArchiver
 
                 if (Directory.Exists(folder))
                 {
-                    if (prompt)
+                    if (ShouldCreateNewArchive(folder))
                     {
-                        // Calculate the total size of the files in the folder
-                        long totalSize = CalculateFolderSize(folder);
-
-                        // Convert total size to gigabytes
-                        double totalSizeGB = totalSize / (1024.0 * 1024.0 * 1024.0);
-
-                        // Check if total size exceeds 1GB
-                        if (totalSizeGB > 1)
+                        if (prompt)
                         {
-                            var result = MessageBox.Show($"The folder {folder} is larger than 1GB ({totalSizeGB:N2} GB). Do you want to continue? Choose No to skip this folder.", "Warning", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                            // Calculate the total size of the files in the folder
+                            long totalSize = CalculateFolderSize(folder);
 
-                            if (result == DialogResult.No)
+                            // Convert total size to gigabytes
+                            double totalSizeGB = totalSize / (1024.0 * 1024.0 * 1024.0);
+
+                            // Check if total size exceeds 1GB
+                            if (totalSizeGB > 1)
                             {
-                                // Skip this folder and continue to the next one
-                                continue;
+                                var result = MessageBox.Show($"The folder {folder} is larger than 1GB ({totalSizeGB:N2} GB). Do you want to continue? Choose No to skip this folder.", "Warning", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+
+                                if (result == DialogResult.No)
+                                {
+                                    // Skip this folder and continue to the next one
+                                    continue;
+                                }
+                                else if (result == DialogResult.Cancel)
+                                {
+                                    // Cancel the entire archiving process
+                                    UpdateStatusLabel("Archiving Cancelled");
+                                    return;
+                                }
+                                // If DialogResult.Yes, continue with the archiving process
                             }
-                            else if (result == DialogResult.Cancel)
-                            {
-                                // Cancel the entire archiving process
-                                UpdateStatusLabel("Archiving Cancelled");
-                                return;
-                            }
-                            // If DialogResult.Yes, continue with the archiving process
+                        }
+
+                        // Display status of completion
+                        if (prompt)
+                        { // Only display the status if the prompt is shown (not when the process is run in the background}
+                            UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
+                        }
+                        string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
+                        string zipFileName = $"{baseFileName} V1.zip";
+                        int version = 1;
+
+                        while (File.Exists(Path.Combine(destinationPath, zipFileName)))
+                        {
+                            version++;
+                            zipFileName = $"{baseFileName} V{version}.zip";
+                        }
+
+                        var zipFilePath = Path.Combine(destinationPath, zipFileName);
+
+                        ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
+                        if (prompt)
+                        { // Only display the status if the prompt is shown (not when the process is run in the background}
+                            UpdateStatusLabel($"Completed: {folder}");
                         }
                     }
-
-                    // Display status of completion
-                    if (prompt)
-                    { // Only display the status if the prompt is shown (not when the process is run in the background}
-                        UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
-                    }
-                    string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
-                    string zipFileName = $"{baseFileName} V1.zip";
-                    int version = 1;
-
-                    while (File.Exists(Path.Combine(destinationPath, zipFileName)))
+                    else
                     {
-                        version++;
-                        zipFileName = $"{baseFileName} V{version}.zip";
-                    }
-
-                    var zipFilePath = Path.Combine(destinationPath, zipFileName);
-
-                    ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
-                    if (prompt)
-                    { // Only display the status if the prompt is shown (not when the process is run in the background}
-                        UpdateStatusLabel($"Completed: {folder}");
+                        // Skip archiving the folder, no changes detected
+                        continue;
                     }
                 }
                 else
@@ -891,6 +867,127 @@ public class FolderArchiver
                 UpdateStatusLabel("Error during archiving");
             }
         }
+    }
+
+    private bool ShouldCreateNewArchive(string folderPath)
+    {
+        if (IsZipfileComparisonSkipped())
+        {
+            Debug.WriteLine("Zipfile comparison skipped due to configuration.");
+            return true;
+        }
+
+        var latestZipFilePath = GetLatestZipFilePath(folderPath);
+        if (string.IsNullOrEmpty(latestZipFilePath))
+        {
+            Debug.WriteLine("No existing archive found, creating a new one.");
+            return true; // No archive to compare against, return true.
+        }
+
+        Debug.WriteLine($"Comparing against latest archive: {latestZipFilePath}");
+
+        using (ZipArchive archive = ZipFile.OpenRead(latestZipFilePath))
+        {
+            var zipEntries = archive.Entries.ToDictionary(entry => entry.FullName, entry => entry.LastWriteTime.DateTime);
+
+            // print out the entries for debugging
+            foreach (var entry in zipEntries)
+            {
+                Debug.WriteLine($"Archive entry: {entry.Key} (Modified: {entry.Value})");
+            }
+
+            foreach (string filePath in Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories))
+            {
+                FileInfo localFile = new FileInfo(filePath);
+                string relativePath = GetRelativePath(filePath, folderPath)
+                    .Replace('\\', '/') // Use forward slashes
+                    .TrimStart('/'); // Ensure no leading slash
+
+                // Debug.WriteLine($"Checking file: {relativePath}");
+
+                // Check if the local file exists in the zip archive
+                if (!zipEntries.ContainsKey(relativePath))
+                {
+                    Debug.WriteLine($"New file found, not present in archive: {relativePath}");
+                    return true; // File is new, create a new archive.
+                }
+                else
+                {
+                    var zipLastWriteTime = zipEntries[relativePath];
+                    Debug.WriteLine($"Found matching archive entry for {relativePath}. Comparing timestamps...");
+
+                    // Add your timestamp comparison logic here
+                    TimeSpan timeDifference = localFile.LastWriteTime - zipLastWriteTime;
+                    Debug.WriteLine($"Time difference (in seconds): {timeDifference.TotalSeconds}");
+
+                    if (timeDifference > TimeSpan.FromSeconds(10)) // Using 10 seconds as an example
+                    {
+                        Debug.WriteLine($"File modified since last archive: {relativePath}, Local: {localFile.LastWriteTime}, Archive: {zipLastWriteTime}");
+                        return true; // File has been modified, create a new archive.
+                    }
+                }
+            }
+        }
+
+        Debug.WriteLine("No changes detected, no new archive needed.");
+        return false; // No changes detected, no need for a new archive.
+    }
+
+    private string GetLatestZipFilePath(string folderPath)
+    {
+        // Extract just the folder name from the full path
+        string folderName = new DirectoryInfo(folderPath).Name;
+
+        // Construct the search pattern to match zip files for the folder
+        string searchPattern = $"*{folderName} V*.zip";
+
+        Debug.WriteLine("Using search pattern: " + destinationPath + searchPattern);
+
+        // Use destinationPath which points to the backup destination for zip files
+        string[] existingArchives = Directory.GetFiles(destinationPath, searchPattern);
+
+        Debug.WriteLine($"{existingArchives.Length} archives found for {folderName}");
+
+        // Check if the array is empty before calling OrderByDescending
+        if (existingArchives.Length == 0)
+        {
+            Debug.WriteLine("No archives found. A new one will be created.");
+            return null;
+        }
+
+        // Extract and sort the version numbers, and pick the latest archive
+        string latestArchive = existingArchives.OrderByDescending(f => f).FirstOrDefault();
+
+        Debug.WriteLine($"Latest archive determined: {latestArchive}");
+
+        // Return the full path of the latest archive
+        return latestArchive;
+    }
+
+
+    private string GetRelativePath(string filePath, string folderPath)
+    {
+        // Assuming folderPath is the full path to the "TC_Settings" folder,
+        // and filePath is the full path to a file within that folder.
+        string relativePath = filePath.Substring(folderPath.Length + 1).Replace('\\', '/');
+
+        // Prepend the folder name to match the archive entry format.
+        // You might need to adjust this part if folderPath or filePath doesn't directly include the folder name.
+        string folderName = new DirectoryInfo(folderPath).Name;
+        relativePath = $"{folderName}/{relativePath}"; // Now matches format "TC_Settings/Settings 2020-06-24.vssettings"
+
+        return relativePath;
+    }
+
+
+    private bool IsZipfileComparisonSkipped()
+    {
+        var config = AppConfigManager.ReadConfigIni("config.ini");
+        if (config.TryGetValue("skipZipfileComparison", out string skipComparison) && skipComparison.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return false;
     }
 
     private long CalculateFolderSize(string folder)
@@ -932,3 +1029,40 @@ public class FolderArchiver
         }
     }
 }
+
+// Helper class to manage the application configuration
+public static class AppConfigManager
+{
+    public static Dictionary<string, string> ReadConfigIni(string filePath)
+    {
+        var config = new Dictionary<string, string>();
+
+        // Check if the file exists to avoid FileNotFoundException
+        if (File.Exists(filePath))
+        {
+            var lines = File.ReadAllLines(filePath);
+            foreach (var line in lines)
+            {
+                // Skip empty lines and comments
+                if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith(";"))
+                {
+                    var parts = line.Split('=', 2); // Split the line into key and value
+                    if (parts.Length == 2)
+                    {
+                        var key = parts[0].Trim();
+                        var value = parts[1].Trim();
+                        config[key] = value;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Optionally, log the error or throw an exception if the file is not found
+            MessageBox.Show($"Configuration file not found: {filePath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        return config;
+    }
+}
+
