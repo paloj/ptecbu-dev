@@ -155,6 +155,7 @@ static class Program
         }
 
         // Start the backup process on a separate thread
+        IsBackupInProgress = true;
         Task.Run(() =>
         {
             BackupManager.PerformBackup(customDestination);
@@ -452,6 +453,7 @@ class CustomApplicationContext : ApplicationContext
                         }
 
                         // Start the backup process on a separate thread
+                        Program.IsBackupInProgress = true;
                         Task.Run(() =>
                         {
                             BackupManager.PerformBackup(tickDestination);

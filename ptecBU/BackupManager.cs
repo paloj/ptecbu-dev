@@ -212,6 +212,21 @@ public class BackupManager
 
                     Program.RobocopyProcess.WaitForExit();
 
+                    // Check if Program.RobocopyProcess is null after waiting for exit. This can happen if the process was killed or exited unexpectedly or cancelled by the user.
+                    if (Program.RobocopyProcess == null)
+                    {
+                        // Stop blinking tray icon
+                        BlinkTrayIcon(false);
+                        Program.IsBackupInProgress = false;
+
+                        if (exitAfter)
+                        {
+                            Application.Exit();
+                        }
+                        // Exit the PerformBackup method early if the Robocopy process is null
+                        return;
+                    }
+
                     if (!File.Exists("backup.log"))
                     {
                         File.WriteAllText("backup.log", "Error:" + DateTime.Now.ToString("o"));
