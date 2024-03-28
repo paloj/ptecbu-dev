@@ -27,6 +27,8 @@ class SettingsForm : Form
     private Label backupDestinationLabel;
     private Label lastSystemImageBackupLabel;
     private Label globalSettingsLabel;
+    private Label globalMaxZipRetentionUpDownLabel;
+    private NumericUpDown globalMaxZipRetentionUpDown;
     public Label ArchiveStatusLabel;
     private LinkLabel openConfigFileLinkLabel;
     private Button systemImageBackupButton;
@@ -40,6 +42,7 @@ class SettingsForm : Form
         ShowAlways = true
     };
     // Controls for individual zip backup settings
+    public Label individualSettingsLabel;
     private ComboBox backupOptionComboBox;
     private Label maxZipRetentionLabel;
     private NumericUpDown maxZipRetentionUpDown;
@@ -152,10 +155,19 @@ class SettingsForm : Form
         Controls.Add(removeExcludedItemButton);
 
         // Initialize the individual folder settings controls
+
+        individualSettingsLabel = new Label
+        {
+            Text = "Select folder to see individual settings",
+            AutoSize = true,
+            Location = new Point(10, 233)
+        };
+        Controls.Add(individualSettingsLabel);
+
         backupOptionComboBox = new ComboBox
         {
             Location = new Point(10, 250),
-            Width = 170,
+            Width = 180,
             DropDownStyle = ComboBoxStyle.DropDownList,
             Visible = false,
         };
@@ -299,7 +311,7 @@ class SettingsForm : Form
         // Create the global settings label
         globalSettingsLabel = new Label()
         {
-            Location = new Point(350, 355), // Adjust these values to place the label appropriately
+            Location = new Point(350, 325), // Adjust these values to place the label appropriately
             Text = "Global Settings",
             AutoSize = true
         };
@@ -308,7 +320,7 @@ class SettingsForm : Form
         // Create the "Launch on Windows Startup" checkbox
         launchOnStartupCheckBox = new CheckBox()
         {
-            Location = new Point(350, 375), // Adjust these values to place the checkbox appropriately
+            Location = new Point(350, 345), // Adjust these values to place the checkbox appropriately
             Text = "Launch on Windows Startup",
             AutoSize = true
         };
@@ -338,7 +350,7 @@ class SettingsForm : Form
         // CheckBox for including zip in backup
         includeZipInBackupCheckBox = new CheckBox
         {
-            Location = new Point(350, 395), // Adjust as needed
+            Location = new Point(350, 365), // Adjust as needed
             Text = "Include Zip in Backup",
             AutoSize = true
         };
@@ -354,7 +366,7 @@ class SettingsForm : Form
         // CheckBox for only make zip backup
         onlyMakeZipBackupCheckBox = new CheckBox
         {
-            Location = new Point(350, 415), // Adjust as needed
+            Location = new Point(350, 385), // Adjust as needed
             Text = "Only Make Zip Backup",
             AutoSize = true
         };
@@ -365,6 +377,36 @@ class SettingsForm : Form
         {
             onlyMakeZipBackupCheckBox.Checked = onlyMakeZipBackupValue.ToLower() == "true";
         }
+
+        // Create the global max zip retention label
+        globalMaxZipRetentionUpDownLabel = new Label
+        {
+            Text = "Max Zip files stored (0=no limit):",
+            AutoSize = true,
+            Location = new Point(390, 410) // Adjust as needed
+        };
+        Controls.Add(globalMaxZipRetentionUpDownLabel);
+
+        globalMaxZipRetentionUpDown = new NumericUpDown
+        {
+            Location = new Point(350, 405), // Adjust as needed
+            Width = 35,
+            Height = 10,
+            Minimum = 0,
+            Maximum = 365,
+            Value = 0
+        };
+        Controls.Add(globalMaxZipRetentionUpDown);
+        // Read the value from the config.ini file and set the numeric up-down accordingly
+        if (config.TryGetValue("defaultMaxZipRetention", out string defaultMaxZipRetentionValue))
+        {
+            globalMaxZipRetentionUpDown.Value = int.Parse(defaultMaxZipRetentionValue);
+        }
+        // Subscribe to the ValueChanged event to update the config.ini file
+        globalMaxZipRetentionUpDown.ValueChanged += (s, e) =>
+        {
+            UpdateConfigIni("defaultMaxZipRetention", globalMaxZipRetentionUpDown.Value.ToString());
+        };
 
         openConfigFileLinkLabel = new LinkLabel()
         {
@@ -431,6 +473,7 @@ class SettingsForm : Form
             maxZipRetentionLabel.Visible = false;
             maxZipRetentionUpDown.Visible = false;
             skipCompareCheckBox.Visible = false;
+            individualSettingsLabel.Text = $"Select folder to see individual settings";
         }
     }
 
@@ -457,9 +500,21 @@ class SettingsForm : Form
                 ? int.Parse(globalConfig["defaultMaxZipRetention"])
                 : 0; // Default to 0 for no limit if not specified
             skipCompareCheckBox.Checked = globalConfig.ContainsKey("skipZipfileComparison")
-                ? bool.Parse(globalConfig["defaultSkipCompare"])
+                ? bool.Parse(globalConfig["skipZipfileComparison"])
                 : false; // Default to false if not specified
         }
+        // Update the label to show the folder path.
+        individualSettingsLabel.Text = $"Settings for: {TrimPath(folderPath)}";
+    }
+    //Function to trim long folder path and show only the end part
+    private string TrimPath(string path, int maxLength = 30)
+    {
+        if (path.Length <= maxLength)
+        {
+            return path;
+        }
+        // Trim the path to the last maxLength characters. Add "..." at the beginning to indicate the path is trimmed and two first characters to show the root folder
+        return path.Substring(0, 2) + ".." + path.Substring(path.Length - maxLength);
     }
 
 
@@ -552,7 +607,7 @@ class SettingsForm : Form
         // If the string width exceeds the available width, adjust it
         if (fullStringSize.Width > e.Bounds.Width)
         {
-            string ellipsis = "...";
+            string ellipsis =fullPath.Substring(0, 3) + "..";
             SizeF ellipsisSize = e.Graphics.MeasureString(ellipsis, e.Font);
             int charsToFit = fullPath.Length;
 
@@ -563,7 +618,7 @@ class SettingsForm : Form
             }
 
             // Prepare the textToShow with ellipsis indicating text is trimmed
-            textToShow = ellipsis + fullPath.Substring(fullPath.Length - charsToFit);
+            textToShow =ellipsis + fullPath.Substring(fullPath.Length - charsToFit);
         }
 
         // Set string format to near alignment (since we're manually adjusting the string to show its end)
