@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Microsoft.VisualBasic;
 
 class SettingsForm : Form
 {
@@ -535,43 +536,6 @@ class SettingsForm : Form
     }
 
 
-    public class FolderConfig
-    {
-        public string FolderPath { get; set; }
-        public BackupOptions BackupOption { get; set; }
-        public int MaxZipRetention { get; set; }
-        public bool SkipCompare { get; set; }
-    }
-
-    public enum BackupOptions
-    {
-        UseGlobalSetting,
-        OnlyMakeZipBackup,
-        IncludeZipInNormalBackup
-    }
-
-    public static class FolderConfigManager
-    {
-        private static readonly string FolderConfigPath = "folder_config.json";
-
-        public static Dictionary<string, FolderConfig> LoadFolderConfigs()
-        {
-            if (File.Exists(FolderConfigPath))
-            {
-                string json = File.ReadAllText(FolderConfigPath);
-                return JsonSerializer.Deserialize<Dictionary<string, FolderConfig>>(json);
-            }
-
-            return new Dictionary<string, FolderConfig>();
-        }
-
-        public static void SaveFolderConfigs(Dictionary<string, FolderConfig> folderConfigs)
-        {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(folderConfigs, options);
-            File.WriteAllText(FolderConfigPath, json);
-        }
-    }
 
 
     // Display tooltip for the listbox items
@@ -607,7 +571,7 @@ class SettingsForm : Form
         // If the string width exceeds the available width, adjust it
         if (fullStringSize.Width > e.Bounds.Width)
         {
-            string ellipsis =fullPath.Substring(0, 3) + "..";
+            string ellipsis = fullPath.Substring(0, 3) + "..";
             SizeF ellipsisSize = e.Graphics.MeasureString(ellipsis, e.Font);
             int charsToFit = fullPath.Length;
 
@@ -618,7 +582,7 @@ class SettingsForm : Form
             }
 
             // Prepare the textToShow with ellipsis indicating text is trimmed
-            textToShow =ellipsis + fullPath.Substring(fullPath.Length - charsToFit);
+            textToShow = ellipsis + fullPath.Substring(fullPath.Length - charsToFit);
         }
 
         // Set string format to near alignment (since we're manually adjusting the string to show its end)
@@ -972,6 +936,44 @@ class SettingsForm : Form
     }
 }
 
+public static class FolderConfigManager
+{
+    private static readonly string FolderConfigPath = "folder_config.json";
+
+    public static Dictionary<string, FolderConfig> LoadFolderConfigs()
+    {
+        if (File.Exists(FolderConfigPath))
+        {
+            string json = File.ReadAllText(FolderConfigPath);
+            return JsonSerializer.Deserialize<Dictionary<string, FolderConfig>>(json);
+        }
+
+        return new Dictionary<string, FolderConfig>();
+    }
+
+    public static void SaveFolderConfigs(Dictionary<string, FolderConfig> folderConfigs)
+    {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        string json = JsonSerializer.Serialize(folderConfigs, options);
+        File.WriteAllText(FolderConfigPath, json);
+    }
+}
+
+public class FolderConfig
+{
+    public string FolderPath { get; set; }
+    public BackupOptions BackupOption { get; set; }
+    public int MaxZipRetention { get; set; }
+    public bool SkipCompare { get; set; }
+}
+
+public enum BackupOptions
+{
+    UseGlobalSetting,
+    OnlyMakeZipBackup,
+    IncludeZipInNormalBackup
+}
+
 public class FolderArchiver
 {
     private Label statusLabel;
@@ -984,6 +986,7 @@ public class FolderArchiver
         ReadConfig();
     }
 
+    // Read Global Config
     private void ReadConfig()
     {
         try
@@ -1013,6 +1016,19 @@ public class FolderArchiver
         }
     }
 
+    // Read individual folder settings
+    public FolderConfig LoadFolderSettings(string folderPath)
+    {
+        var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+        if (folderConfigs.TryGetValue(folderPath, out var config))
+        {
+            return config;
+        }
+
+        return null; // No individual settings found
+    }
+
+
     public void ArchiveFolders(bool prompt = true)
     {
         try
@@ -1021,13 +1037,16 @@ public class FolderArchiver
             int totalFolders = folders.Length;  // Total number of folders
             int currentFolderIndex = 0;         // Initialize a counter to keep track of the current folder index
 
+            var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+
             foreach (var folder in folders)
             {
                 currentFolderIndex++; // Increment the current folder index at the start of each loop iteration for percentage display
 
                 if (Directory.Exists(folder))
                 {
-                    if (ShouldCreateNewArchive(folder))
+                    folderConfigs.TryGetValue(folder, out var folderConfig);
+                    if (ShouldCreateNewArchive(folder, folderConfig))
                     {
                         if (prompt)
                         {
@@ -1112,9 +1131,10 @@ public class FolderArchiver
         }
     }
 
-    private bool ShouldCreateNewArchive(string folderPath)
-    {
-        if (IsZipfileComparisonSkipped())
+    private bool ShouldCreateNewArchive(string folderPath,FolderConfig folderConfig)
+    {     
+        // Check if the folder should be skipped from comparison
+        if (IsZipfileComparisonSkipped(folderConfig))
         {
             Debug.WriteLine("Zipfile comparison skipped due to configuration.");
             return true;
@@ -1223,15 +1243,19 @@ public class FolderArchiver
     }
 
 
-    private bool IsZipfileComparisonSkipped()
+    private bool IsZipfileComparisonSkipped(FolderConfig folderConfig)
     {
-        var config = AppConfigManager.ReadConfigIni("config.ini");
-        if (config.TryGetValue("skipZipfileComparison", out string skipComparison) && skipComparison.Equals("true", StringComparison.OrdinalIgnoreCase))
+        if (folderConfig != null)
         {
-            return true;
+            // Use the individual setting if available
+            return folderConfig.SkipCompare;
         }
-        return false;
+
+        // Fallback to the global setting
+        var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
+        return globalConfig.TryGetValue("skipZipfileComparison", out string skipComparison) && bool.Parse(skipComparison);
     }
+
 
     private long CalculateFolderSize(string folder)
     {
