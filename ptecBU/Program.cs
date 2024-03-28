@@ -72,8 +72,7 @@ static class Program
             if (!File.Exists(FolderSource))
             {
                 // If it doesn't exist, show the SettingsForm
-                var settingsForm = new SettingsForm();
-                settingsForm.ShowDialog();
+                ShowSettingsForm();
             }
 
             // Create a context menu for the tray icon
@@ -104,6 +103,18 @@ static class Program
 
             // Update the tooltip
             UpdateTrayIconTooltip();
+            
+
+            #if DEBUG
+            ShowSettingsForm();
+            #endif
+
+            // Check for "-s" argument to open settings form
+            if (args.Length > 0 && args[0] == "-s")
+            {
+                Debug.WriteLine("-s argument found");
+                ShowSettingsForm();
+            }
 
             // Run the application
             // Create the custom application context
@@ -111,6 +122,12 @@ static class Program
             // Run the application with the custom context
             Application.Run(context);
         }
+    }
+
+    private static void ShowSettingsForm()
+    {
+        var settingsForm = new SettingsForm();
+        settingsForm.ShowDialog();
     }
 
     private static void Application_ApplicationExit(object sender, EventArgs e)
@@ -294,8 +311,7 @@ static class Program
     private static void OnSettings(object sender, EventArgs e)
     {
         // Handle settings clicked
-        var settingsForm = new SettingsForm();
-        settingsForm.ShowDialog();
+        ShowSettingsForm();
     }
 
     private static void OnExit(object sender, EventArgs e)

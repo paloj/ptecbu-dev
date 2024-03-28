@@ -8,6 +8,7 @@ using System.Drawing;
 using System.Reflection;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Text.Json;
 
 class SettingsForm : Form
 {
@@ -25,6 +26,7 @@ class SettingsForm : Form
     private Label lastBackupLabel;
     private Label backupDestinationLabel;
     private Label lastSystemImageBackupLabel;
+    private Label globalSettingsLabel;
     public Label ArchiveStatusLabel;
     private LinkLabel openConfigFileLinkLabel;
     private Button systemImageBackupButton;
@@ -37,6 +39,13 @@ class SettingsForm : Form
         ReshowDelay = 500,
         ShowAlways = true
     };
+    // Controls for individual zip backup settings
+    private ComboBox backupOptionComboBox;
+    private Label maxZipRetentionLabel;
+    private NumericUpDown maxZipRetentionUpDown;
+    private CheckBox skipCompareCheckBox;
+
+
 
     private int previousIndex = -1; // To track the item index that the tooltip was last shown for
 
@@ -49,7 +58,7 @@ class SettingsForm : Form
 
         // Set up the form
         Text = $"PtecBU Settings - App version: {version}";
-        Size = new Size(670, 465);
+        Size = new Size(670, 500);
         FormBorderStyle = FormBorderStyle.FixedSingle; // Make the form non-resizable
 
         // Set the form's icon
@@ -75,6 +84,8 @@ class SettingsForm : Form
         // Subscribe to the DrawItem event
         foldersListBox.DrawItem += new DrawItemEventHandler(FoldersListBox_DrawItem);
         foldersListBox.MouseMove += new MouseEventHandler(FoldersListBox_MouseMove);
+        // Subscribe to the SelectedIndexChanged event
+        foldersListBox.SelectedIndexChanged += new EventHandler(foldersListBox_SelectedIndexChanged);
 
         // Add the ListBox to the form's controls
         Controls.Add(foldersListBox);
@@ -140,27 +151,106 @@ class SettingsForm : Form
         removeExcludedItemButton.Click += OnRemoveExcludedItem;
         Controls.Add(removeExcludedItemButton);
 
-        // Create the label for the last successful backup
-        lastBackupLabel = new Label()
+        // Initialize the individual folder settings controls
+        backupOptionComboBox = new ComboBox
         {
-            Location = new Point(10, 340), // Adjust these values to place the label appropriately
-            AutoSize = true
+            Location = new Point(10, 250),
+            Width = 170,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Visible = false,
         };
-        Controls.Add(lastBackupLabel);
+        backupOptionComboBox.Items.AddRange(new object[] {
+        "Use global setting",
+        "Only make zip backup",
+        "Include zip in normal backup"
+        });
+
+
+        maxZipRetentionLabel = new Label
+        {
+            Text = "Max zip files stored (0=no limit):",
+            AutoSize = true,
+            Visible = false,
+            Location = new Point(10, 282)
+        };
+
+        maxZipRetentionUpDown = new NumericUpDown
+        {
+            Location = new Point(190, 280),
+            Width = 35,
+            Minimum = 0,
+            Maximum = 365,
+            Value = 0,
+            Visible = false
+        };
+
+        skipCompareCheckBox = new CheckBox
+        {
+            Text = "Skip file comparison",
+            AutoSize = true,
+            Visible = false,
+            Location = new Point(10, 305)
+        };
+
+        Controls.Add(backupOptionComboBox);
+        Controls.Add(maxZipRetentionLabel);
+        Controls.Add(maxZipRetentionUpDown);
+        Controls.Add(skipCompareCheckBox);
+
+        // Add event handlers to handle changes in the UI and update folder settings
+        backupOptionComboBox.SelectedIndexChanged += (s, e) =>
+        {
+            SaveFolderSettings(foldersListBox.SelectedItem.ToString());
+        };
+
+        maxZipRetentionUpDown.ValueChanged += (s, e) =>
+        {
+            SaveFolderSettings(foldersListBox.SelectedItem.ToString());
+        };
+
+        skipCompareCheckBox.CheckedChanged += (s, e) =>
+        {
+            SaveFolderSettings(foldersListBox.SelectedItem.ToString());
+        };
+
+
+        ArchiveFoldersButton = new Button()
+        {
+            Location = new Point(10, 340), // Adjust these values to place the button appropriately
+            AutoSize = true, // Enable auto-sizing to adjust the button's width based on its text content
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, // Allow the button to grow and shrink
+            Height = 25, // Specify the desired height
+            Text = "Zip all folders to backup location now",
+        };
+        // Create a tooltip and associate it with the button
+        ToolTip archiveToolTip = new();
+        // Set up the tooltip text for the button.
+        archiveToolTip.SetToolTip(ArchiveFoldersButton, "Click to backup folders on the list to zip files.(Might take long time!)");
+
+        ArchiveFoldersButton.Click += ArchiveFoldersButton_Click;
+        Controls.Add(ArchiveFoldersButton);
 
         // Create the label for the Archiving status
         ArchiveStatusLabel = new Label()
         {
-            Location = new Point(10, 265), // Adjust these values to place the label appropriately
+            Location = new Point(235, 345), // Adjust these values to place the label appropriately
             AutoSize = true,
             Text = ""   // Empty placeholder for archiving status
         };
         Controls.Add(ArchiveStatusLabel);
 
+        // Create the label for the last successful backup
+        lastBackupLabel = new Label()
+        {
+            Location = new Point(10, 370), // Adjust these values to place the label appropriately
+            AutoSize = true
+        };
+        Controls.Add(lastBackupLabel);
+
         //Get and display backup destination
         backupDestinationLabel = new Label()
         {
-            Location = new Point(10, 360), // Adjust these values to place the label appropriately
+            Location = new Point(10, 390), // Adjust these values to place the label appropriately
             Text = "Backup destination: " + BackupManager.GetBackupDestination(),
             AutoSize = true
         };
@@ -170,24 +260,15 @@ class SettingsForm : Form
 
         lastSystemImageBackupLabel = new Label()
         {
-            Location = new Point(10, 380), // Adjust these values to place the label appropriately
+            Location = new Point(10, 410), // Adjust these values to place the label appropriately
             Text = "Last System backup: ",
             AutoSize = true
         };
         Controls.Add(lastSystemImageBackupLabel);
 
-        openConfigFileLinkLabel = new LinkLabel()
-        {
-            Location = new Point(10, 320), // Adjust these values to place the label appropriately
-            Text = "Open config.ini",
-            AutoSize = true
-        };
-        openConfigFileLinkLabel.LinkClicked += new LinkLabelLinkClickedEventHandler(OpenConfigFileLinkLabel_LinkClicked);
-        Controls.Add(openConfigFileLinkLabel);
-
         systemImageBackupButton = new Button()
         {
-            Location = new Point(10, 395), // Adjust these values to place the button appropriately
+            Location = new Point(10, 430), // Adjust these values to place the button appropriately
             AutoSize = true, // Enable auto-sizing to adjust the button's width based on its text content
             AutoSizeMode = AutoSizeMode.GrowAndShrink, // Allow the button to grow and shrink
             Height = 25, // Specify the desired height
@@ -212,29 +293,22 @@ class SettingsForm : Form
         CheckUpdatesButton.Click += CheckUpdatesButton_Click;
         Controls.Add(CheckUpdatesButton);
 
-        ArchiveFoldersButton = new Button()
-        {
-            Location = new Point(10, 235), // Adjust these values to place the button appropriately
-            AutoSize = true, // Enable auto-sizing to adjust the button's width based on its text content
-            AutoSizeMode = AutoSizeMode.GrowAndShrink, // Allow the button to grow and shrink
-            Height = 25, // Specify the desired height
-            Text = "Zip all folders to backup location now",
-        };
-        // Create a tooltip and associate it with the button
-        ToolTip archiveToolTip = new();
-        // Set up the tooltip text for the button.
-        archiveToolTip.SetToolTip(ArchiveFoldersButton, "Click to backup folders on the list to zip files.(Might take long time!)");
-
-        ArchiveFoldersButton.Click += ArchiveFoldersButton_Click;
-        Controls.Add(ArchiveFoldersButton);
-
         // Update the last successful backup label
         UpdateLastSuccessfulBackup();
+
+        // Create the global settings label
+        globalSettingsLabel = new Label()
+        {
+            Location = new Point(350, 355), // Adjust these values to place the label appropriately
+            Text = "Global Settings",
+            AutoSize = true
+        };
+        Controls.Add(globalSettingsLabel);
 
         // Create the "Launch on Windows Startup" checkbox
         launchOnStartupCheckBox = new CheckBox()
         {
-            Location = new Point(350, 280), // Adjust these values to place the checkbox appropriately
+            Location = new Point(350, 375), // Adjust these values to place the checkbox appropriately
             Text = "Launch on Windows Startup",
             AutoSize = true
         };
@@ -264,7 +338,7 @@ class SettingsForm : Form
         // CheckBox for including zip in backup
         includeZipInBackupCheckBox = new CheckBox
         {
-            Location = new Point(350, 310), // Adjust as needed
+            Location = new Point(350, 395), // Adjust as needed
             Text = "Include Zip in Backup",
             AutoSize = true
         };
@@ -280,7 +354,7 @@ class SettingsForm : Form
         // CheckBox for only make zip backup
         onlyMakeZipBackupCheckBox = new CheckBox
         {
-            Location = new Point(350, 340), // Adjust as needed
+            Location = new Point(350, 415), // Adjust as needed
             Text = "Only Make Zip Backup",
             AutoSize = true
         };
@@ -292,10 +366,19 @@ class SettingsForm : Form
             onlyMakeZipBackupCheckBox.Checked = onlyMakeZipBackupValue.ToLower() == "true";
         }
 
+        openConfigFileLinkLabel = new LinkLabel()
+        {
+            Location = new Point(350, 435), // Adjust these values to place the label appropriately
+            Text = "Open config.ini",
+            AutoSize = true
+        };
+        openConfigFileLinkLabel.LinkClicked += new LinkLabelLinkClickedEventHandler(OpenConfigFileLinkLabel_LinkClicked);
+        Controls.Add(openConfigFileLinkLabel);
+
         // Create the Close button
         closeButton = new Button()
         {
-            Location = new Point(560, 395), // Adjust these values to place the button in the right lower corner
+            Location = new Point(560, 430), // Adjust these values to place the button in the right lower corner
             Text = "Close",
             Height = 25,
         };
@@ -327,9 +410,114 @@ class SettingsForm : Form
                 }
             }
         }
-
-
     }
+
+    private void foldersListBox_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        var isSelected = foldersListBox.SelectedIndex != -1;
+        backupOptionComboBox.Visible = isSelected;
+        maxZipRetentionLabel.Visible = isSelected;
+        maxZipRetentionUpDown.Visible = isSelected;
+        skipCompareCheckBox.Visible = isSelected;
+
+        if (isSelected)
+        {
+            // Load settings for the selected folder or set defaults if no individual settings
+            LoadFolderSettings(foldersListBox.SelectedItem.ToString());
+        }
+        else
+        {
+            backupOptionComboBox.Visible = false;
+            maxZipRetentionLabel.Visible = false;
+            maxZipRetentionUpDown.Visible = false;
+            skipCompareCheckBox.Visible = false;
+        }
+    }
+
+    private void LoadFolderSettings(string folderPath)
+    {
+        var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+
+        // Attempt to load individual settings for the selected folder
+        if (folderConfigs.TryGetValue(folderPath, out var config))
+        {
+            // Set the UI elements to reflect the folder's individual settings
+            backupOptionComboBox.SelectedIndex = (int)config.BackupOption;
+            maxZipRetentionUpDown.Value = config.MaxZipRetention;
+            skipCompareCheckBox.Checked = config.SkipCompare;
+        }
+        else
+        {
+            // No individual settings found, load global settings
+            var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
+            backupOptionComboBox.SelectedIndex = globalConfig.ContainsKey("defaultBackupOption")
+                ? int.Parse(globalConfig["defaultBackupOption"])
+                : 0; // Default to 'UseGlobalSetting' if not specified
+            maxZipRetentionUpDown.Value = globalConfig.ContainsKey("defaultMaxZipRetention")
+                ? int.Parse(globalConfig["defaultMaxZipRetention"])
+                : 0; // Default to 0 for no limit if not specified
+            skipCompareCheckBox.Checked = globalConfig.ContainsKey("skipZipfileComparison")
+                ? bool.Parse(globalConfig["defaultSkipCompare"])
+                : false; // Default to false if not specified
+        }
+    }
+
+
+    private void SaveFolderSettings(string folderPath)
+    {
+        var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+
+        // Update or add new settings
+        folderConfigs[folderPath] = new FolderConfig
+        {
+            FolderPath = folderPath,
+            BackupOption = (BackupOptions)backupOptionComboBox.SelectedIndex,
+            MaxZipRetention = (int)maxZipRetentionUpDown.Value,
+            SkipCompare = skipCompareCheckBox.Checked
+        };
+
+        FolderConfigManager.SaveFolderConfigs(folderConfigs);
+    }
+
+
+    public class FolderConfig
+    {
+        public string FolderPath { get; set; }
+        public BackupOptions BackupOption { get; set; }
+        public int MaxZipRetention { get; set; }
+        public bool SkipCompare { get; set; }
+    }
+
+    public enum BackupOptions
+    {
+        UseGlobalSetting,
+        OnlyMakeZipBackup,
+        IncludeZipInNormalBackup
+    }
+
+    public static class FolderConfigManager
+    {
+        private static readonly string FolderConfigPath = "folder_config.json";
+
+        public static Dictionary<string, FolderConfig> LoadFolderConfigs()
+        {
+            if (File.Exists(FolderConfigPath))
+            {
+                string json = File.ReadAllText(FolderConfigPath);
+                return JsonSerializer.Deserialize<Dictionary<string, FolderConfig>>(json);
+            }
+
+            return new Dictionary<string, FolderConfig>();
+        }
+
+        public static void SaveFolderConfigs(Dictionary<string, FolderConfig> folderConfigs)
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(folderConfigs, options);
+            File.WriteAllText(FolderConfigPath, json);
+        }
+    }
+
 
     // Display tooltip for the listbox items
     private void FoldersListBox_MouseMove(object sender, MouseEventArgs e)
