@@ -47,6 +47,12 @@ public class BackupManager
         Program.IsBackupInProgress = true;
         BlinkTrayIcon(true);
 
+        // Load global settings
+        var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
+
+        // Load individual folder settings
+        var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+
         // If onlyMakeZipBackup is true, perform only the zip backup and skip robocopy
         if (IsOnlyMakeZipBackupEnabled())
         {
@@ -147,6 +153,35 @@ public class BackupManager
             // Perform backup for each folder
             for (int i = 0; i < folders.Length; i++)
             {
+                var onlyMakeZipBackup = false;
+                var includeZipInBackup = false;
+                folderConfigs.TryGetValue(folders[i], out var folderConfig);
+
+                // Check folders individual settings for 'BackupOption' from folderConfigs. Skip robocopy if the folder is zip only (BackupOption=1)
+                if (folderConfig != null)
+                {
+                    switch ((BackupOptions)folderConfig.BackupOption)
+                    {
+                        case BackupOptions.OnlyMakeZipBackup:
+                            onlyMakeZipBackup = true;
+                            break;
+                        case BackupOptions.IncludeZipInNormalBackup:
+                            includeZipInBackup = true;
+                            break;
+                        case BackupOptions.UseGlobalSetting:
+                            // Fallback to global settings
+                            onlyMakeZipBackup = bool.Parse(globalConfig.GetValueOrDefault("onlyMakeZipBackup", "false"));
+                            includeZipInBackup = bool.Parse(globalConfig.GetValueOrDefault("includeZipInBackup", "false"));
+                            break;
+                    }
+                }
+
+                // Skip robocopy if the folder is set to only make zip backups
+                if (onlyMakeZipBackup)
+                {
+                    continue;
+                }
+
                 // Get the source folder
                 // Normalize the folder path
                 string folder = folders[i].TrimEnd('\\');
