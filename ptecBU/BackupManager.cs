@@ -325,8 +325,8 @@ public class BackupManager
 
             }
 
-            // Add zip to backup if enabled in config.ini
-            if (IsZipInBackupEnabled())
+            // Add zip to backup if enabled in config.ini and not set to only make zip backups
+            if (!IsOnlyMakeZipBackupEnabled())
             {
                 // Call the zip function from SettignsForm.cs
                 var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class

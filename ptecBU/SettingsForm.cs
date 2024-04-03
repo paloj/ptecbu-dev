@@ -1038,6 +1038,7 @@ public class FolderArchiver
             int currentFolderIndex = 0;         // Initialize a counter to keep track of the current folder index
 
             var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+            var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
             foreach (var folder in folders)
             {
@@ -1046,7 +1047,7 @@ public class FolderArchiver
                 if (Directory.Exists(folder))
                 {
                     folderConfigs.TryGetValue(folder, out var folderConfig);
-                    if (ShouldCreateNewArchive(folder, folderConfig))
+                    if (ShouldCreateNewArchive(folder, folderConfig, globalConfig))
                     {
                         if (prompt)
                         {
@@ -1131,10 +1132,20 @@ public class FolderArchiver
         }
     }
 
-    private bool ShouldCreateNewArchive(string folderPath,FolderConfig folderConfig)
-    {     
+    private bool ShouldCreateNewArchive(string folderPath, FolderConfig folderConfig, Dictionary<string, string> globalConfig)
+    {
+        // Check if folder is set to use global settings and if includeZipInBackup=false in global settings
+        if (folderConfig?.BackupOption == BackupOptions.UseGlobalSetting)
+        {
+            if (globalConfig.TryGetValue("includeZipInBackup", out string includeZipInBackup) && !bool.Parse(includeZipInBackup))
+            {
+                Debug.WriteLine("Zipfile creation skipped due to global setting.");
+                return false;
+            }
+        }
+
         // Check if the folder should be skipped from comparison
-        if (IsZipfileComparisonSkipped(folderConfig))
+        if (IsZipfileComparisonSkipped(folderConfig, globalConfig))
         {
             Debug.WriteLine("Zipfile comparison skipped due to configuration.");
             return true;
@@ -1154,10 +1165,12 @@ public class FolderArchiver
             var zipEntries = archive.Entries.ToDictionary(entry => entry.FullName, entry => entry.LastWriteTime.DateTime);
 
             // print out the entries for debugging
+            /*
             foreach (var entry in zipEntries)
             {
                 Debug.WriteLine($"Archive entry: {entry.Key} (Modified: {entry.Value})");
             }
+            */
 
             foreach (string filePath in Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories))
             {
@@ -1177,11 +1190,11 @@ public class FolderArchiver
                 else
                 {
                     var zipLastWriteTime = zipEntries[relativePath];
-                    Debug.WriteLine($"Found matching archive entry for {relativePath}. Comparing timestamps...");
+                    // Debug.WriteLine($"Found matching archive entry for {relativePath}. Comparing timestamps...");
 
                     // Add your timestamp comparison logic here
                     TimeSpan timeDifference = localFile.LastWriteTime - zipLastWriteTime;
-                    Debug.WriteLine($"Time difference (in seconds): {timeDifference.TotalSeconds}");
+                    // Debug.WriteLine($"Time difference (in seconds): {timeDifference.TotalSeconds}");
 
                     if (timeDifference > TimeSpan.FromSeconds(10)) // Using 10 seconds as an example
                     {
@@ -1243,18 +1256,18 @@ public class FolderArchiver
     }
 
 
-    private bool IsZipfileComparisonSkipped(FolderConfig folderConfig)
+    private bool IsZipfileComparisonSkipped(FolderConfig folderConfig, Dictionary<string, string> globalConfig)
     {
-        if (folderConfig != null)
+        // If folderConfig is not null and not set to use global setting, use the individual setting
+        if (folderConfig != null && folderConfig.BackupOption != BackupOptions.UseGlobalSetting)
         {
-            // Use the individual setting if available
             return folderConfig.SkipCompare;
         }
 
         // Fallback to the global setting
-        var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
         return globalConfig.TryGetValue("skipZipfileComparison", out string skipComparison) && bool.Parse(skipComparison);
     }
+
 
 
     private long CalculateFolderSize(string folder)
