@@ -103,11 +103,11 @@ static class Program
 
             // Update the tooltip
             UpdateTrayIconTooltip();
-            
 
-            #if DEBUG
+
+#if DEBUG
             ShowSettingsForm();
-            #endif
+#endif
 
             // Check for "-s" argument to open settings form
             if (args.Length > 0 && args[0] == "-s")
@@ -176,6 +176,14 @@ static class Program
         Task.Run(() =>
         {
             BackupManager.PerformBackup(customDestination);
+            IsBackupInProgress = false; // Mark backup as complete
+
+            // Update UI from the UI thread
+            trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
+            {
+                UpdateTrayIconTooltip();
+                UpdateTrayMenuItem(); // Ensure this updates the UI correctly after backup
+            }));
         });
 
         // Check backup progress state and update UI accordingly
