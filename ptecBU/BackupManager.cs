@@ -215,8 +215,8 @@ public class BackupManager
                     string mtValue = ReadMTValueFromConfig();
 
                     // Build robocopy command
-                    string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:backup_{i + 1}.log {excludeParams} /A-:SH";
-                    File.WriteAllText("robocopyArgs.txt", robocopyArgs.ToString());
+                    string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:log/backup_{i + 1}.log {excludeParams} /A-:SH";
+                    File.WriteAllText("log/robocopyArgs.log", robocopyArgs.ToString());
 
                     // Before starting a new robocopy process, ensure any existing one is properly handled
                     if (Program.RobocopyProcess != null && !Program.RobocopyProcess.HasExited)
@@ -262,17 +262,17 @@ public class BackupManager
                         return;
                     }
 
-                    if (!File.Exists("backup.log"))
+                    if (!File.Exists("log/backup.log"))
                     {
-                        File.WriteAllText("backup.log", "Error:" + DateTime.Now.ToString("o"));
+                        File.WriteAllText("log/backup.log", "Error:" + DateTime.Now.ToString("o"));
                     }
 
-                    string logContents = File.ReadAllText("backup.log");
+                    string logContents = File.ReadAllText("log/backup.log");
 
                     if (logContents.Contains("ERROR 112"))
                     {
                         // Write current timestamp to file
-                        File.WriteAllText("lastFail.txt", DateTime.Now.ToString("o"));
+                        File.WriteAllText("log/lastFail.log", DateTime.Now.ToString("o"));
 
                         // Show a popup warning that the destination is full
                         MessageBox.Show("Destination drive is full. Backup operation could not be completed.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -296,16 +296,16 @@ public class BackupManager
                         catch (Exception ex)
                         {
                             // Write current timestamp and error to file
-                            File.WriteAllText("attribFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {ex}");
+                            File.WriteAllText("log/attribFail.log", $"{DateTime.Now.ToString("o")}\nExit code: {ex}");
                         }
 
                         // Write current timestamp to file
-                        File.WriteAllText("lastBackup.txt", DateTime.Now.ToString("o"));
+                        File.WriteAllText("log/lastBackup.log", DateTime.Now.ToString("o"));
                     }
                     else
                     {
                         // Write current timestamp and exit code to file
-                        File.WriteAllText("lastFail.txt", $"{DateTime.Now.ToString("o")}\nExit code: {Program.RobocopyProcess.ExitCode}");
+                        File.WriteAllText("log/lastFail.log", $"{DateTime.Now.ToString("o")}\nExit code: {Program.RobocopyProcess.ExitCode}");
 
                         // Show a popup warning that the backup operation failed
                         MessageBox.Show($"Backup operation failed with exit code {Program.RobocopyProcess.ExitCode}.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -320,7 +320,7 @@ public class BackupManager
                 else
                 {
                     // Write current timestamp to file
-                    File.WriteAllText("lastFail.txt", DateTime.Now.ToString("o"));
+                    File.WriteAllText("log/lastFail.log", DateTime.Now.ToString("o"));
                 }
 
             }
@@ -334,17 +334,10 @@ public class BackupManager
             }
         }
 
-        // Stop blinking tray icon
-        BlinkTrayIcon(false);
-        Program.IsBackupInProgress = false;
-
         if (exitAfter)
         {
             Application.Exit();
         }
-
-        // Update tray icon tooltip after backup completion
-        Program.UpdateTrayIconTooltip();
     }
 
     private static string ReadMTValueFromConfig() // Read the MT value from config.ini that is used in robocopy to set the number of threads
@@ -447,7 +440,7 @@ public class BackupManager
     private static CancellationTokenSource blinkingCancellationTokenSource;
     private static Task blinkingTask;
 
-    private static async void BlinkTrayIcon(bool start) // Blink the tray icon while backup is in progress
+    public static async void BlinkTrayIcon(bool start) // Blink the tray icon while backup is in progress
     {
         // Define the path to the green and yellow icons
         string greenIconPath = "Resources/green.ico";
@@ -507,13 +500,13 @@ public class BackupManager
 
     public static bool IsLastBackupOlderThanOneMonth()   // Check if the last backup was more than a month ago
     {
-        if (!File.Exists("lastBackup.txt"))
+        if (!File.Exists("log/lastBackup.log"))
         {
             // If the file doesn't exist, assume the last backup was more than a month ago
             return true;
         }
 
-        string timestampStr = File.ReadAllText("lastBackup.txt");
+        string timestampStr = File.ReadAllText("log/lastBackup.log");
         DateTime lastBackup;
         if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
         {
@@ -528,13 +521,13 @@ public class BackupManager
     /* USING DEFINED HOURS FROM CONFIG.INI INSTEAD OF HARDCODED 1 DAY.
         public static bool IsLastBackupOlderThanOneDay()
         {
-            if (!File.Exists("lastBackup.txt"))
+            if (!File.Exists("log/lastBackup.log"))
             {
                 // If the file doesn't exist, assume the last backup was more than a day ago
                 return true;
             }
 
-            string timestampStr = File.ReadAllText("lastBackup.txt");
+            string timestampStr = File.ReadAllText("log/lastBackup.log");
             DateTime lastBackup;
             if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
             {
@@ -565,12 +558,12 @@ public class BackupManager
             }
         }
 
-        if (!File.Exists("lastBackup.txt"))
+        if (!File.Exists("log/lastBackup.log"))
         {
             return true;
         }
 
-        string timestampStr = File.ReadAllText("lastBackup.txt");
+        string timestampStr = File.ReadAllText("log/lastBackup.log");
         DateTime lastBackup;
         if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
         {
@@ -629,7 +622,7 @@ public class BackupManager
 
     private static void LogError(Exception ex) // Log error to file
     {
-        string logFilePath = "network_check_error.log";
+        string logFilePath = "log/network_check_error.log";
         string errorMessage = $"Error: {ex.Message}\nStack Trace: {ex.StackTrace}\nTimestamp: {DateTime.Now}\n";
 
         try

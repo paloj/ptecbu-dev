@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Text.Json;
 using Microsoft.VisualBasic;
+using System.Text.RegularExpressions;
 
 class SettingsForm : Form
 {
@@ -28,6 +29,7 @@ class SettingsForm : Form
     private Label backupDestinationLabel;
     private Label lastSystemImageBackupLabel;
     private Label globalSettingsLabel;
+    private CheckBox globalSkipCompareCheckBox;
     private Label globalMaxZipRetentionUpDownLabel;
     private NumericUpDown globalMaxZipRetentionUpDown;
     public Label ArchiveStatusLabel;
@@ -194,7 +196,8 @@ class SettingsForm : Form
             Minimum = 0,
             Maximum = 365,
             Value = 0,
-            Visible = false
+            Visible = false,
+            Enabled = false
         };
 
         skipCompareCheckBox = new CheckBox
@@ -312,7 +315,7 @@ class SettingsForm : Form
         // Create the global settings label
         globalSettingsLabel = new Label()
         {
-            Location = new Point(350, 325), // Adjust these values to place the label appropriately
+            Location = new Point(350, 305), // Adjust these values to place the label appropriately
             Text = "Global Settings",
             AutoSize = true
         };
@@ -321,7 +324,7 @@ class SettingsForm : Form
         // Create the "Launch on Windows Startup" checkbox
         launchOnStartupCheckBox = new CheckBox()
         {
-            Location = new Point(350, 345), // Adjust these values to place the checkbox appropriately
+            Location = new Point(350, 325), // Adjust these values to place the checkbox appropriately
             Text = "Launch on Windows Startup",
             AutoSize = true
         };
@@ -351,7 +354,7 @@ class SettingsForm : Form
         // CheckBox for including zip in backup
         includeZipInBackupCheckBox = new CheckBox
         {
-            Location = new Point(350, 365), // Adjust as needed
+            Location = new Point(350, 345), // Adjust as needed
             Text = "Include Zip in Backup",
             AutoSize = true
         };
@@ -367,7 +370,7 @@ class SettingsForm : Form
         // CheckBox for only make zip backup
         onlyMakeZipBackupCheckBox = new CheckBox
         {
-            Location = new Point(350, 385), // Adjust as needed
+            Location = new Point(350, 365), // Adjust as needed
             Text = "Only Make Zip Backup",
             AutoSize = true
         };
@@ -377,6 +380,21 @@ class SettingsForm : Form
         if (config.TryGetValue("onlyMakeZipBackup", out string onlyMakeZipBackupValue))
         {
             onlyMakeZipBackupCheckBox.Checked = onlyMakeZipBackupValue.ToLower() == "true";
+        }
+
+        // Create the global skip compare checkbox
+        globalSkipCompareCheckBox = new CheckBox
+        {
+            Location = new Point(350, 385), // Adjust as needed
+            Text = "Skip file comparison",
+            AutoSize = true
+        };
+        globalSkipCompareCheckBox.CheckedChanged += GlobalSkipCompareCheckBox_CheckedChanged;
+        Controls.Add(globalSkipCompareCheckBox);
+        // Read the value from the config.ini file and set the checkbox accordingly
+        if (config.TryGetValue("skipZipfileComparison", out string skipZipfileComparisonValue))
+        {
+            globalSkipCompareCheckBox.Checked = skipZipfileComparisonValue.ToLower() == "true";
         }
 
         // Create the global max zip retention label
@@ -475,7 +493,13 @@ class SettingsForm : Form
             maxZipRetentionUpDown.Visible = false;
             skipCompareCheckBox.Visible = false;
             individualSettingsLabel.Text = $"Select folder to see individual settings";
+
+            maxZipRetentionUpDown.Enabled = false;
+            skipCompareCheckBox.Enabled = false;
         }
+        // maxZipRetentionUpDown and skipCompareCheckBox is enabled only if the selected backup option is not 'UseGlobalSetting'
+        maxZipRetentionUpDown.Enabled = isSelected && backupOptionComboBox.SelectedIndex != 0;
+        skipCompareCheckBox.Enabled = isSelected && backupOptionComboBox.SelectedIndex != 0;
     }
 
     private void LoadFolderSettings(string folderPath)
@@ -532,11 +556,19 @@ class SettingsForm : Form
             SkipCompare = skipCompareCheckBox.Checked
         };
 
+        // Enable or disable the maxZipRetentionUpDown and skipCompareCheckBox based on the selected backup option
+        maxZipRetentionUpDown.Enabled = backupOptionComboBox.SelectedIndex != 0;
+        skipCompareCheckBox.Enabled = backupOptionComboBox.SelectedIndex != 0;
+
+        // If the selected backup option is 'UseGlobalSetting', set the maxZipRetention and skipCompareCheckBox value to the global setting
+        if (backupOptionComboBox.SelectedIndex == 0)
+        {
+            maxZipRetentionUpDown.Value = globalMaxZipRetentionUpDown.Value;
+            skipCompareCheckBox.Checked = globalSkipCompareCheckBox.Checked;
+        }
+
         FolderConfigManager.SaveFolderConfigs(folderConfigs);
     }
-
-
-
 
     // Display tooltip for the listbox items
     private void FoldersListBox_MouseMove(object sender, MouseEventArgs e)
@@ -625,8 +657,15 @@ class SettingsForm : Form
         // Handle remove folder clicked
         if (foldersListBox.SelectedItem != null)
         {
+            // Remove folder settings from the folder config file
+            var folderConfigs = FolderConfigManager.LoadFolderConfigs();
+            folderConfigs.Remove(foldersListBox.SelectedItem.ToString());
+
+            // Save the updated folder configs
+            FolderConfigManager.SaveFolderConfigs(folderConfigs);
             foldersListBox.Items.Remove(foldersListBox.SelectedItem);
         }
+
         //update folders.txt file
         WriteListBoxContentsToFile(foldersListBox, "folders.txt");
     }
@@ -668,7 +707,7 @@ class SettingsForm : Form
 
     private void UpdateLastSuccessfulBackup()
     {
-        string filePath = "lastBackup.txt"; // replace with your path
+        string filePath = "log/lastBackup.log"; // replace with your path
 
         if (File.Exists(filePath))
         {
@@ -696,7 +735,7 @@ class SettingsForm : Form
         }
 
         //Update last system backup label
-        string sysimgfilePath = "lastsystemimage.txt"; // replace with your path
+        string sysimgfilePath = "log/lastsystemimage.log"; // replace with your path
 
         string absolutePath = Path.GetFullPath(sysimgfilePath);
         //MessageBox.Show($"Checking existence of file at: {absolutePath}");
@@ -819,8 +858,8 @@ class SettingsForm : Form
             // Launch the BAT file with the specified start info
             System.Diagnostics.Process.Start(psi);
 
-            // Write the current date and time to lastsystemimage.txt
-            File.WriteAllText("lastsystemimage.txt", DateTime.Now.ToString());
+            // Write the current date and time to lastsystemimage.log
+            File.WriteAllText("log/lastsystemimage.log", DateTime.Now.ToString());
 
             // Update the last system image backup label
             UpdateLastSuccessfulBackup();
@@ -855,6 +894,12 @@ class SettingsForm : Form
     {
         // Update config.ini with the new value
         UpdateConfigIni("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
+    }
+
+    private void GlobalSkipCompareCheckBox_CheckedChanged(object sender, EventArgs e)
+    {
+        // Update config.ini with the new value
+        UpdateConfigIni("skipZipfileComparison", globalSkipCompareCheckBox.Checked ? "true" : "false");
     }
 
     private void UpdateConfigIni(string key, string value)
@@ -911,7 +956,7 @@ class SettingsForm : Form
         }
         catch (Exception ex)
         {
-            string logPath = Path.Combine(launcherPath, "updater_log.txt");
+            string logPath = Path.Combine(launcherPath, "log/updater_err.log");
             string logContent = $"Could not start updater. Error: {ex.Message}\nMain App Path: {updaterPath}";
             File.WriteAllText(logPath, logContent);
             Console.WriteLine(logContent);
@@ -978,7 +1023,7 @@ public class FolderArchiver
 {
     private Label statusLabel;
     private string destinationPath;
-    private const string LogFilePath = "archive_err.log";
+    private const string LogFilePath = "log/archive_err.log";
 
     public FolderArchiver(Label statusLabel = null)
     {
@@ -1040,6 +1085,9 @@ public class FolderArchiver
             var folderConfigs = FolderConfigManager.LoadFolderConfigs();
             var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
+            // Initialize empty log file and keep it open for writing
+            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}");
+
             foreach (var folder in folders)
             {
                 currentFolderIndex++; // Increment the current folder index at the start of each loop iteration for percentage display
@@ -1083,15 +1131,27 @@ public class FolderArchiver
                             UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
                         }
                         string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
-                        string zipFileName = $"{baseFileName} V1.zip";
                         int version = 1;
 
-                        while (File.Exists(Path.Combine(destinationPath, zipFileName)))
+                        // Generate the search pattern to find all existing versions for today's date
+                        string searchPattern = $"{baseFileName} V*.zip";
+                        string[] existingArchives = Directory.GetFiles(destinationPath, searchPattern);
+
+                        if (existingArchives.Length > 0)
                         {
-                            version++;
-                            zipFileName = $"{baseFileName} V{version}.zip";
+                            // Extract version numbers, sort them, and get the highest version
+                            var versions = existingArchives.Select(file =>
+                            {
+                                int fileVersion = 0;
+                                string versionPart = Path.GetFileNameWithoutExtension(file).Split(' ').Last().TrimStart('V');
+                                int.TryParse(versionPart, out fileVersion);
+                                return fileVersion;
+                            });
+                            version = versions.Any() ? versions.Max() + 1 : version;
                         }
 
+                        // Now, construct the filename with the correct version number
+                        string zipFileName = $"{baseFileName} V{version}.zip";
                         var zipFilePath = Path.Combine(destinationPath, zipFileName);
 
                         ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
@@ -1099,6 +1159,18 @@ public class FolderArchiver
                         { // Only display the status if the prompt is shown (not when the process is run in the background}
                             UpdateStatusLabel($"Completed: {folder}");
                         }
+
+                        // Check if max zip retention is set for the folder or in global settings. Use global setting if folder backup option is set to UseGlobalSetting
+                        int maxZipRetention = folderConfig?.BackupOption == BackupOptions.UseGlobalSetting
+                            ? int.Parse(globalConfig["defaultMaxZipRetention"])
+                            : folderConfig?.MaxZipRetention ?? 0;
+
+                        // Delete old zip files of the selected folder if max zip retention is set
+                        if (maxZipRetention > 0)
+                        {
+                            DeleteOldZipFiles(destinationPath, Path.GetFileName(folder), maxZipRetention);
+                        }
+
                     }
                     else
                     {
@@ -1130,6 +1202,14 @@ public class FolderArchiver
                 UpdateStatusLabel("Error during archiving");
             }
         }
+        finally
+        {
+            // Stop blinking tray icon
+            BackupManager.BlinkTrayIcon(false);
+            Program.IsBackupInProgress = false;
+            // Update tray icon tooltip after backup completion
+            Program.UpdateTrayIconTooltip();
+        }
     }
 
     private bool ShouldCreateNewArchive(string folderPath, FolderConfig folderConfig, Dictionary<string, string> globalConfig)
@@ -1140,6 +1220,7 @@ public class FolderArchiver
             if (globalConfig.TryGetValue("includeZipInBackup", out string includeZipInBackup) && !bool.Parse(includeZipInBackup))
             {
                 Debug.WriteLine("Zipfile creation skipped due to global setting.");
+                File.AppendAllText("log/zip_archive.log", $"Zipfile creation skipped for {folderPath} due to global setting.\n");
                 return false;
             }
         }
@@ -1148,6 +1229,7 @@ public class FolderArchiver
         if (IsZipfileComparisonSkipped(folderConfig, globalConfig))
         {
             Debug.WriteLine("Zipfile comparison skipped due to configuration.");
+            File.AppendAllText("log/zip_archive.log", $"Zipfile comparison skipped for {folderPath} due to configuration.\n");
             return true;
         }
 
@@ -1155,6 +1237,7 @@ public class FolderArchiver
         if (string.IsNullOrEmpty(latestZipFilePath))
         {
             Debug.WriteLine("No existing archive found, creating a new one.");
+            File.AppendAllText("log/zip_archive.log", $"No existing archive found for {folderPath}, creating a new one.\n");
             return true; // No archive to compare against, return true.
         }
 
@@ -1240,6 +1323,34 @@ public class FolderArchiver
         return latestArchive;
     }
 
+    // Delete old zip files based on max zip retention. Starting from the oldest file, keep the most recent maxZipRetention files. The files are prefixed with timestamp $"{DateTime.Now:yyyy-MM-dd}
+    private void DeleteOldZipFiles(string destinationPath, string folder, int maxZipRetention)
+    {
+        string searchPattern = $"*{folder} V*.zip";
+        string[] existingArchives = Directory.GetFiles(destinationPath, searchPattern);
+
+        if (existingArchives.Length <= maxZipRetention)
+        {
+            return; // No need to delete any files
+        }
+
+        // Sort the files by creation time in ascending order (oldest first)
+        var filesToDelete = existingArchives.OrderBy(f => new FileInfo(f).CreationTime).Take(existingArchives.Length - maxZipRetention);
+
+        foreach (var file in filesToDelete)
+        {
+            try
+            {
+                File.Delete(file);
+                Debug.WriteLine($"Deleted old zip file: {file}");
+                File.AppendAllText("log/zip_archive.log", $"Deleted old zip file: {file}\n");
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error deleting old zip file: {file}. {ex.Message}");
+            }
+        }
+    }
 
     private string GetRelativePath(string filePath, string folderPath)
     {

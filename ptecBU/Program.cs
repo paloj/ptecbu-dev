@@ -28,6 +28,18 @@ static class Program
         string APP_PATH = Application.ExecutablePath.ToString();
         Environment.CurrentDirectory = Path.GetDirectoryName(APP_PATH);
 
+        // Check if the log directory exists, if not create it
+        if (!Directory.Exists("log"))
+        {
+            Directory.CreateDirectory("log");
+        }
+
+        // Check if config.ini exists, if not create it with default values
+        if (!File.Exists("config.ini"))
+        {
+            File.WriteAllText("config.ini", "// This is the configuration file for the backup program.\n// Destination is the location of the backup.\ndestination=\\192.168.11.110\backup\n\n// autobackup enables or disables the automatic backup.\nautobackup=1\n\n//hoursbetweenbackups is the number of hours between backups.\nhoursbetweenbackups=24\n\n//robocopymt is the number of threads to use for robocopy.\nrobocopymt=16\n\n//twobackups enables or disables the two backup system. two first weeks of the moth will have suffix _1 and the last two weeks will have suffix _2\ntwobackups=false\n\n//includeZipInBackup enables or disables the zipping of the backup.\nincludeZipInBackup=false\n\n//onlyMakeZipBackup=true sets the automatic backup to only make zip files of the selected folders and skip the incremental robocopy backup\nonlyMakeZipBackup=false\n\n//skipZipfileComparison=true skips the comparison of the zip files and just makes a new zip file every time\nskipZipfileComparison=false\n\n//defaultMaxZipRetention is the max number of zip files to keep for each folder. 0 means keep all.\ndefaultMaxZipRetention=0\n\n//systemimagedestination is the location of the system image backup.\nsystemimagedestination=\n");
+        }
+
         //Variable to tell the backupmanager if program is started with arguments. then no trayicon actions
         IsRunningWithArguments = args.Length > 0;
 
@@ -239,7 +251,7 @@ static class Program
 
     public static void UpdateTrayIconTooltip()
     {
-        string filePath = "lastBackup.txt"; // replace with your path
+        string filePath = "log/lastBackup.log"; // replace with your path
 
         if (BackupManager.IsBackupLocationReachable())
         {
