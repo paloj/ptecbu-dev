@@ -37,7 +37,12 @@ static class Program
         // Check if config.ini exists, if not create it with default values
         if (!File.Exists("config.ini"))
         {
-            File.WriteAllText("config.ini", "// This is the configuration file for the backup program.\n// Destination is the location of the backup.\ndestination=\\192.168.11.110\backup\n\n// autobackup enables or disables the automatic backup.\nautobackup=1\n\n//hoursbetweenbackups is the number of hours between backups.\nhoursbetweenbackups=24\n\n//robocopymt is the number of threads to use for robocopy.\nrobocopymt=16\n\n//twobackups enables or disables the two backup system. two first weeks of the moth will have suffix _1 and the last two weeks will have suffix _2\ntwobackups=false\n\n//includeZipInBackup enables or disables the zipping of the backup.\nincludeZipInBackup=false\n\n//onlyMakeZipBackup=true sets the automatic backup to only make zip files of the selected folders and skip the incremental robocopy backup\nonlyMakeZipBackup=false\n\n//skipZipfileComparison=true skips the comparison of the zip files and just makes a new zip file every time\nskipZipfileComparison=false\n\n//defaultMaxZipRetention is the max number of zip files to keep for each folder. 0 means keep all.\ndefaultMaxZipRetention=0\n\n//systemimagedestination is the location of the system image backup.\nsystemimagedestination=\n");
+            File.WriteAllText("config.ini", "// This is the configuration file for the backup program.\n// Destination is the location of the backup.\ndestination=\\192.168.11.110\backup\n\n// autobackup enables or disables the automatic backup.\nautobackup=1\n\n//hoursbetweenbackups is the number of hours between backups.\nhoursbetweenbackups=24\n\n//robocopymt is the number of threads to use for robocopy.\nrobocopymt=16\n\n//twobackups enables or disables the two backup system. two first weeks of the moth will have suffix _1 and the last two weeks will have suffix _2\ntwobackups=false\n\n//includeZipInBackup enables or disables the zipping of the backup.\nincludeZipInBackup=false\n\n//onlyMakeZipBackup=true sets the automatic backup to only make zip files of the selected folders and skip the incremental robocopy backup\nonlyMakeZipBackup=false\n\n//skipZipfileComparison=true skips the comparison of the zip files and just makes a new zip file every time\nskipZipfileComparison=false\n\n//defaultMaxZipRetention is the max number of zip files to keep for each folder. 0 means keep all.\ndefaultMaxZipRetention=10\n\n//systemimagedestination is the location of the system image backup.\nsystemimagedestination=\n");
+        }
+        else
+        {
+            // Update the config.ini file with missing lines
+            UpdateConfigIniFile("config.ini");
         }
 
         //Variable to tell the backupmanager if program is started with arguments. then no trayicon actions
@@ -426,6 +431,60 @@ static class Program
 
         // Return the default value if no custom exclude item list is found
         return "excludedItems.txt";
+    }
+
+    // Function to update missing lines to the config.ini file
+    private static void UpdateConfigIniFile(string configPath)
+    {
+        // Check if the config.ini file exists
+        if (File.Exists(configPath))
+        {
+            // Read all lines from the config.ini file
+            string[] lines = File.ReadAllLines(configPath);
+            // All lines are: destination, autobackup, hoursbetweenbackups, robocopymt, twobackups, includeZipInBackup, onlyMakeZipBackup, skipZipfileComparison, defaultMaxZipRetention, systemimagedestination
+            // Check if the lines are missing and add them
+            if (!lines.Any(line => line.StartsWith("destination=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "destination=\\192.168.11.110\backup\n");
+            };
+            if (!lines.Any(line => line.StartsWith("autobackup=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "autobackup=1\n");
+            };
+            if (!lines.Any(line => line.StartsWith("hoursbetweenbackups=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "hoursbetweenbackups=24\n");
+            };
+            if (!lines.Any(line => line.StartsWith("robocopymt=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "robocopymt=16\n");
+            };
+            if (!lines.Any(line => line.StartsWith("twobackups=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "twobackups=false\n");
+            };
+            if (!lines.Any(line => line.StartsWith("includeZipInBackup=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "includeZipInBackup=false\n");
+            };
+            if (!lines.Any(line => line.StartsWith("onlyMakeZipBackup=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "onlyMakeZipBackup=false\n");
+            };
+            if (!lines.Any(line => line.StartsWith("skipZipfileComparison=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "skipZipfileComparison=false\n");
+            };
+            if (!lines.Any(line => line.StartsWith("defaultMaxZipRetention=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "defaultMaxZipRetention=10\n");
+            };
+            if (!lines.Any(line => line.StartsWith("systemimagedestination=", StringComparison.OrdinalIgnoreCase)))
+            {
+                File.AppendAllText(configPath, "systemimagedestination=\n");
+            };
+
+        };
     }
 }
 
