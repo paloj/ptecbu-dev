@@ -44,6 +44,14 @@ class SettingsForm : Form
         ReshowDelay = 500,
         ShowAlways = true
     };
+
+    private ToolTip LabelToolTip = new(){
+        AutoPopDelay = 5000,
+        InitialDelay = 100,
+        ReshowDelay = 500,
+        ShowAlways = true
+    };
+
     // Controls for individual zip backup settings
     public Label individualSettingsLabel;
     private ComboBox backupOptionComboBox;
@@ -90,6 +98,16 @@ class SettingsForm : Form
         // Subscribe to the DrawItem event
         foldersListBox.DrawItem += new DrawItemEventHandler(FoldersListBox_DrawItem);
         foldersListBox.MouseMove += new MouseEventHandler(FoldersListBox_MouseMove);
+        // Subscribe to the MouseWheel event to change the selected index
+        foldersListBox.MouseWheel += (s, e) =>
+        {
+            int newIndex = foldersListBox.SelectedIndex - Math.Sign(e.Delta);
+            if (newIndex >= 0 && newIndex < foldersListBox.Items.Count)
+            {
+                foldersListBox.SelectedIndex = newIndex;
+            }
+        };
+
         // Subscribe to the SelectedIndexChanged event
         foldersListBox.SelectedIndexChanged += new EventHandler(foldersListBox_SelectedIndexChanged);
 
@@ -104,6 +122,7 @@ class SettingsForm : Form
         };
         addFolderButton.Click += OnAddFolder;
         Controls.Add(addFolderButton);
+        LabelToolTip.SetToolTip(addFolderButton, "Add a folder to the backup list.");
 
         // Create the remove folder button
         removeFolderButton = new Button()
@@ -113,6 +132,7 @@ class SettingsForm : Form
         };
         removeFolderButton.Click += OnRemoveFolder;
         Controls.Add(removeFolderButton);
+        LabelToolTip.SetToolTip(removeFolderButton, "Remove the selected folder from the backup list.");
 
         // Create the text box for adding excluded items
         addExcludedItemTextBox = new TextBox()
@@ -147,6 +167,7 @@ class SettingsForm : Form
         };
         addExcludedItemButton.Click += OnAddExcludedItem;
         Controls.Add(addExcludedItemButton);
+        LabelToolTip.SetToolTip(addExcludedItemButton, "Add an item to the excluded list.");
 
         // Create the remove excluded item button
         removeExcludedItemButton = new Button()
@@ -156,6 +177,7 @@ class SettingsForm : Form
         };
         removeExcludedItemButton.Click += OnRemoveExcludedItem;
         Controls.Add(removeExcludedItemButton);
+        LabelToolTip.SetToolTip(removeExcludedItemButton, "Remove the selected item from the excluded list.");
 
         // Initialize the individual folder settings controls
 
@@ -180,7 +202,6 @@ class SettingsForm : Form
         "Include zip in normal backup"
         });
 
-
         maxZipRetentionLabel = new Label
         {
             Text = "Max zip files stored (0=no limit):",
@@ -188,6 +209,7 @@ class SettingsForm : Form
             Visible = false,
             Location = new Point(10, 282)
         };
+        LabelToolTip.SetToolTip(maxZipRetentionLabel, "Maximum number of zip files to keep in the backup folder for selected folder. Set to 0 for no limit.");
 
         maxZipRetentionUpDown = new NumericUpDown
         {
@@ -199,6 +221,7 @@ class SettingsForm : Form
             Visible = false,
             Enabled = false
         };
+        LabelToolTip.SetToolTip(maxZipRetentionUpDown, "Maximum number of zip files to keep in the backup folder for selected folder. Set to 0 for no limit.");
 
         skipCompareCheckBox = new CheckBox
         {
@@ -207,6 +230,7 @@ class SettingsForm : Form
             Visible = false,
             Location = new Point(10, 305)
         };
+        LabelToolTip.SetToolTip(skipCompareCheckBox, "Skip file comparison inside previous zip file when making zip backup.(Creates new zip file every time)");
 
         Controls.Add(backupOptionComboBox);
         Controls.Add(maxZipRetentionLabel);
@@ -238,10 +262,7 @@ class SettingsForm : Form
             Height = 25, // Specify the desired height
             Text = "Zip all folders to backup location now",
         };
-        // Create a tooltip and associate it with the button
-        ToolTip archiveToolTip = new();
-        // Set up the tooltip text for the button.
-        archiveToolTip.SetToolTip(ArchiveFoldersButton, "Click to backup folders on the list to zip files.(Might take long time!)");
+        LabelToolTip.SetToolTip(ArchiveFoldersButton, "Backup all folders to zip files in the backup location. This may take a long time depending on the folder size.");
 
         ArchiveFoldersButton.Click += ArchiveFoldersButton_Click;
         Controls.Add(ArchiveFoldersButton);
@@ -273,6 +294,7 @@ class SettingsForm : Form
         // Subscribe to the Click event to open the destination when clicked
         backupDestinationLabel.Click += BackupDestinationLabel_Click;
         Controls.Add(backupDestinationLabel);
+        LabelToolTip.SetToolTip(backupDestinationLabel, "Click to open the backup destination folder.");
 
         lastSystemImageBackupLabel = new Label()
         {
@@ -281,6 +303,7 @@ class SettingsForm : Form
             AutoSize = true
         };
         Controls.Add(lastSystemImageBackupLabel);
+        LabelToolTip.SetToolTip(lastSystemImageBackupLabel, "");
 
         systemImageBackupButton = new Button()
         {
@@ -308,6 +331,7 @@ class SettingsForm : Form
         };
         CheckUpdatesButton.Click += CheckUpdatesButton_Click;
         Controls.Add(CheckUpdatesButton);
+        LabelToolTip.SetToolTip(CheckUpdatesButton, "Check for updates online.");
 
         // Update the last successful backup label
         UpdateLastSuccessfulBackup();
@@ -331,6 +355,7 @@ class SettingsForm : Form
         // Subscribe to the CheckedChanged event
         launchOnStartupCheckBox.CheckedChanged += LaunchOnStartupCheckBox_CheckedChanged;
         Controls.Add(launchOnStartupCheckBox);
+        LabelToolTip.SetToolTip(launchOnStartupCheckBox, "Launch the application automatically when Windows starts.");
 
         // Update the checkbox based on the Windows Registry setting for application launch on startup
         using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true))
@@ -366,6 +391,7 @@ class SettingsForm : Form
         {
             includeZipInBackupCheckBox.Checked = includeZipInBackupValue.ToLower() == "true";
         }
+        LabelToolTip.SetToolTip(includeZipInBackupCheckBox, "Create a zip file of each folder to the backup folder when making a backup.");
 
         // CheckBox for only make zip backup
         onlyMakeZipBackupCheckBox = new CheckBox
@@ -381,6 +407,7 @@ class SettingsForm : Form
         {
             onlyMakeZipBackupCheckBox.Checked = onlyMakeZipBackupValue.ToLower() == "true";
         }
+        LabelToolTip.SetToolTip(onlyMakeZipBackupCheckBox, "Create a zip file of each folder to the backup folder without making a normal backup.");
 
         // Create the global skip compare checkbox
         globalSkipCompareCheckBox = new CheckBox
@@ -396,6 +423,7 @@ class SettingsForm : Form
         {
             globalSkipCompareCheckBox.Checked = skipZipfileComparisonValue.ToLower() == "true";
         }
+        LabelToolTip.SetToolTip(globalSkipCompareCheckBox, "Skip file comparison inside previous zip file when making zip backup.(Creates new zip file every time)");
 
         // Create the global max zip retention label
         globalMaxZipRetentionUpDownLabel = new Label
@@ -405,6 +433,7 @@ class SettingsForm : Form
             Location = new Point(390, 410) // Adjust as needed
         };
         Controls.Add(globalMaxZipRetentionUpDownLabel);
+        LabelToolTip.SetToolTip(globalMaxZipRetentionUpDownLabel, "Maximum number of zip files to keep in the backup folder for all folders. Set to 0 for no limit.");
 
         globalMaxZipRetentionUpDown = new NumericUpDown
         {
@@ -484,7 +513,7 @@ class SettingsForm : Form
         if (isSelected)
         {
             // Load settings for the selected folder or set defaults if no individual settings
-            LoadFolderSettings(foldersListBox.SelectedItem.ToString());
+            LoadFolderSettingsUi(foldersListBox.SelectedItem.ToString());
         }
         else
         {
@@ -502,7 +531,7 @@ class SettingsForm : Form
         skipCompareCheckBox.Enabled = isSelected && backupOptionComboBox.SelectedIndex != 0;
     }
 
-    private void LoadFolderSettings(string folderPath)
+    private void LoadFolderSettingsUi(string folderPath)
     {
         var folderConfigs = FolderConfigManager.LoadFolderConfigs();
 
@@ -1062,7 +1091,7 @@ public class FolderArchiver
     }
 
     // Read individual folder settings
-    public FolderConfig LoadFolderSettings(string folderPath)
+    private FolderConfig LoadFolderSettings(string folderPath, Dictionary<string, string> globalConfig)
     {
         var folderConfigs = FolderConfigManager.LoadFolderConfigs();
         if (folderConfigs.TryGetValue(folderPath, out var config))
@@ -1070,9 +1099,26 @@ public class FolderArchiver
             return config;
         }
 
-        return null; // No individual settings found
-    }
+        // If no individual settings are found, create a default FolderConfig using global settings
+        int maxZipRetention = 0;
+        bool skipCompare = false;
 
+        if (globalConfig.TryGetValue("defaultMaxZipRetention", out string maxRetentionStr))
+        {
+            int.TryParse(maxRetentionStr, out maxZipRetention);
+        }
+        if (globalConfig.TryGetValue("skipZipfileComparison", out string skipCompareStr))
+        {
+            bool.TryParse(skipCompareStr, out skipCompare);
+        }
+
+        return new FolderConfig
+        {
+            BackupOption = BackupOptions.UseGlobalSetting,
+            MaxZipRetention = maxZipRetention,
+            SkipCompare = skipCompare
+        };
+    }
 
     public void ArchiveFolders(bool prompt = true)
     {
@@ -1086,7 +1132,7 @@ public class FolderArchiver
             var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
             // Initialize empty log file and keep it open for writing
-            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}");
+            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}/n/n");
 
             foreach (var folder in folders)
             {
@@ -1094,9 +1140,13 @@ public class FolderArchiver
 
                 if (Directory.Exists(folder))
                 {
-                    folderConfigs.TryGetValue(folder, out var folderConfig);
+                    // Load folder settings. If no individual settings are found, use global settings
+                    FolderConfig folderConfig = LoadFolderSettings(folder, globalConfig);
+
+                    // Check if a new archive should be created for the folder. If not, skip archiving
                     if (ShouldCreateNewArchive(folder, folderConfig, globalConfig))
                     {
+                        // Update UI if prompt is true
                         if (prompt)
                         {
                             // Calculate the total size of the files in the folder
@@ -1130,6 +1180,8 @@ public class FolderArchiver
                         { // Only display the status if the prompt is shown (not when the process is run in the background}
                             UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
                         }
+                        
+                        // Set the base filename for the zip archive
                         string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
                         int version = 1;
 
@@ -1154,6 +1206,7 @@ public class FolderArchiver
                         string zipFileName = $"{baseFileName} V{version}.zip";
                         var zipFilePath = Path.Combine(destinationPath, zipFileName);
 
+                        // Create a new zip archive for the folder
                         ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
                         if (prompt)
                         { // Only display the status if the prompt is shown (not when the process is run in the background}
@@ -1205,10 +1258,7 @@ public class FolderArchiver
         finally
         {
             // Stop blinking tray icon
-            BackupManager.BlinkTrayIcon(false);
-            Program.IsBackupInProgress = false;
-            // Update tray icon tooltip after backup completion
-            Program.UpdateTrayIconTooltip();
+            Program.StopBlinking();
         }
     }
 
@@ -1246,14 +1296,6 @@ public class FolderArchiver
         using (ZipArchive archive = ZipFile.OpenRead(latestZipFilePath))
         {
             var zipEntries = archive.Entries.ToDictionary(entry => entry.FullName, entry => entry.LastWriteTime.DateTime);
-
-            // print out the entries for debugging
-            /*
-            foreach (var entry in zipEntries)
-            {
-                Debug.WriteLine($"Archive entry: {entry.Key} (Modified: {entry.Value})");
-            }
-            */
 
             foreach (string filePath in Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories))
             {

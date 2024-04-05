@@ -494,6 +494,7 @@ public class BackupManager
 
             // Stop the blinking animation
             blinkingCancellationTokenSource?.Cancel();
+            // Wait for the blinking task to complete
             await blinkingTask;
         }
     }

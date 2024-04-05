@@ -222,7 +222,7 @@ static class Program
         }
 
         // Reset backup status and update tray menu as necessary
-        IsBackupInProgress = false;
+        StopBlinking();
         UpdateTrayMenuItem();
     }
 
@@ -326,6 +326,18 @@ static class Program
             }
             trayIcon.Text = neverBackupText;
         }
+    }
+
+    // Function to stop blinking and reset the icon to green
+    public static void StopBlinking()
+    {
+        // Stop the blinking
+        IsBackupInProgress = false;
+        BackupManager.BlinkTrayIcon(false);
+        // Update tray icon tooltip after backup completion
+        UpdateTrayIconTooltip();
+        // Update the tray icon to green
+        trayIcon.Icon = new Icon("Resources/green.ico");
     }
 
     private static void OnSettings(object sender, EventArgs e)
