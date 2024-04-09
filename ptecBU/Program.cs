@@ -160,6 +160,16 @@ static class Program
             // User has logged on or unlocked the session
             case SessionSwitchReason.SessionLogon:
             case SessionSwitchReason.SessionUnlock:
+                // Check that the backup timer exist in the CustomApplicationContext
+                if (CustomApplicationContext.backupTimer == null)
+                {
+                    // Create a new backup timer
+                    CustomApplicationContext.CreateBackupTimer();
+                }
+                else if (!CustomApplicationContext.backupTimer.Enabled)
+                {
+                    CustomApplicationContext.backupTimer.Start();
+                }
                 // Resume the backup timer
                 if (CustomApplicationContext.backupTimer != null && !CustomApplicationContext.backupTimer.Enabled)
                 {
@@ -492,7 +502,7 @@ class CustomApplicationContext : ApplicationContext
 {
     private NotifyIcon trayIcon;
     public static System.Windows.Forms.Timer backupTimer; // Make the timer accessible
-
+  
     public CustomApplicationContext(NotifyIcon trayIcon)
     {
         this.trayIcon = trayIcon;
@@ -506,6 +516,15 @@ class CustomApplicationContext : ApplicationContext
             backupTimer.Tick += BackupTimer_Tick;
             backupTimer.Start();
         }
+    }
+
+    // public function to create new backup timer
+    public static void CreateBackupTimer()
+    {
+        backupTimer = new System.Windows.Forms.Timer();
+        backupTimer.Interval = 60000; // 1 minutes
+        backupTimer.Tick += new EventHandler(BackupTimer_Tick);
+        backupTimer.Start();
     }
 
     private bool IsAutoBackupEnabled()
@@ -526,7 +545,7 @@ class CustomApplicationContext : ApplicationContext
         return false;
     }
 
-    private void BackupTimer_Tick(object sender, EventArgs e)
+    private static void BackupTimer_Tick(object sender, EventArgs e)
     {
         string filePath = Program.TickFolderSource;
 
@@ -571,7 +590,7 @@ class CustomApplicationContext : ApplicationContext
                     else
                     {
                         // Change the tray icon to red
-                        trayIcon.Icon = new Icon("Resources/red.ico");
+                        Program.trayIcon.Icon = new Icon("Resources/red.ico");
                         Program.destinationReachable = false;
                     }
                 }
