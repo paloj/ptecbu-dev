@@ -163,16 +163,31 @@ static class Program
                 // Check that the backup timer exist in the CustomApplicationContext
                 if (CustomApplicationContext.backupTimer == null)
                 {
+                    // Write to log file that the backup timer was null
+                    using (StreamWriter sw = File.AppendText("log/backupTimerNull.log"))
+                    {
+                        sw.WriteLine(DateTime.Now.ToString());
+                    }
                     // Create a new backup timer
                     CustomApplicationContext.CreateBackupTimer();
                 }
                 else if (!CustomApplicationContext.backupTimer.Enabled)
                 {
+                    // Write to log file that the backup timer was not enabled
+                    using (StreamWriter sw = File.AppendText("log/backupTimerNotEnabled.log"))
+                    {
+                        sw.WriteLine(DateTime.Now.ToString());
+                    }
                     CustomApplicationContext.backupTimer.Start();
                 }
                 // Resume the backup timer
                 if (CustomApplicationContext.backupTimer != null && !CustomApplicationContext.backupTimer.Enabled)
                 {
+                    // Write to log file that the backup timer was not enabled
+                    using (StreamWriter sw = File.AppendText("log/backupTimerNotEnabled.log"))
+                    {
+                        sw.WriteLine(DateTime.Now.ToString());
+                    }
                     CustomApplicationContext.backupTimer.Start();
                 }
                 break;
@@ -183,6 +198,11 @@ static class Program
                 // Pause the backup timer
                 if (CustomApplicationContext.backupTimer != null && CustomApplicationContext.backupTimer.Enabled)
                 {
+                    // Write to log file that logoff or lock was detected
+                    using (StreamWriter sw = File.AppendText("log/logoffOrLockDetected.log"))
+                    {
+                        sw.WriteLine(DateTime.Now.ToString());
+                    }
                     CustomApplicationContext.backupTimer.Stop();
                 }
                 break;
