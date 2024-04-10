@@ -179,16 +179,22 @@ static class Program
                         sw.WriteLine(DateTime.Now.ToString());
                     }
                     CustomApplicationContext.backupTimer.Start();
-                }
-                // Resume the backup timer
-                if (CustomApplicationContext.backupTimer != null && !CustomApplicationContext.backupTimer.Enabled)
-                {
-                    // Write to log file that the backup timer was not enabled
-                    using (StreamWriter sw = File.AppendText("log/backupTimerNotEnabled.log"))
+                    // Check if the backupTimer was successfully started
+                    if (CustomApplicationContext.backupTimer.Enabled)
                     {
-                        sw.WriteLine(DateTime.Now.ToString());
+                        // Write to log file that the backup timer was successfully started
+                        using (StreamWriter sw = File.AppendText("log/backupTimerStarted.log"))
+                        {
+                            sw.WriteLine(DateTime.Now.ToString());
+                        }
+                    } else
+                    {
+                        // Write to log file that the backup timer was not successfully started
+                        using (StreamWriter sw = File.AppendText("log/backupTimerNotStarted.log"))
+                        {
+                            sw.WriteLine(DateTime.Now.ToString());
+                        }
                     }
-                    CustomApplicationContext.backupTimer.Start();
                 }
                 break;
 
