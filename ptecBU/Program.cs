@@ -160,42 +160,7 @@ static class Program
             // User has logged on or unlocked the session
             case SessionSwitchReason.SessionLogon:
             case SessionSwitchReason.SessionUnlock:
-                // Check that the backup timer exist in the CustomApplicationContext
-                if (CustomApplicationContext.backupTimer == null)
-                {
-                    // Write to log file that the backup timer was null
-                    using (StreamWriter sw = File.AppendText("log/backupTimerNull.log"))
-                    {
-                        sw.WriteLine(DateTime.Now.ToString());
-                    }
-                    // Create a new backup timer
-                    CustomApplicationContext.CreateBackupTimer();
-                }
-                else if (!CustomApplicationContext.backupTimer.Enabled)
-                {
-                    // Write to log file that the backup timer was not enabled
-                    using (StreamWriter sw = File.AppendText("log/backupTimerNotEnabled.log"))
-                    {
-                        sw.WriteLine(DateTime.Now.ToString());
-                    }
-                    CustomApplicationContext.backupTimer.Start();
-                    // Check if the backupTimer was successfully started
-                    if (CustomApplicationContext.backupTimer.Enabled)
-                    {
-                        // Write to log file that the backup timer was successfully started
-                        using (StreamWriter sw = File.AppendText("log/backupTimerStarted.log"))
-                        {
-                            sw.WriteLine(DateTime.Now.ToString());
-                        }
-                    } else
-                    {
-                        // Write to log file that the backup timer was not successfully started
-                        using (StreamWriter sw = File.AppendText("log/backupTimerNotStarted.log"))
-                        {
-                            sw.WriteLine(DateTime.Now.ToString());
-                        }
-                    }
-                }
+                Application.Restart();
                 break;
 
             // User has logged off or locked the session
