@@ -537,18 +537,17 @@ class CustomApplicationContext : ApplicationContext
         if (IsAutoBackupEnabled())
         {
             // Create the backup timer
-            backupTimer = new System.Windows.Forms.Timer();
-            backupTimer.Interval = 60000; // 1 minutes
-            backupTimer.Tick += BackupTimer_Tick;
-            backupTimer.Start();
+            CreateBackupTimer();
         }
     }
 
     // public function to create new backup timer
     public static void CreateBackupTimer()
     {
-        backupTimer = new System.Windows.Forms.Timer();
-        backupTimer.Interval = 60000; // 1 minutes
+        backupTimer = new System.Windows.Forms.Timer
+        {
+            Interval = 60000 // 1 minutes
+        };
         backupTimer.Tick += new EventHandler(BackupTimer_Tick);
         backupTimer.Start();
     }
@@ -564,6 +563,11 @@ class CustomApplicationContext : ApplicationContext
             {
                 if (line.Trim().Equals("autobackup=1", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Write to log file that autobackup is enabled. Overwrite the file if it already exists
+                    using (StreamWriter sw = File.CreateText("log/autobackupEnabled.log"))
+                    {
+                        sw.WriteLine(DateTime.Now.ToString());
+                    }
                     return true;
                 }
             }
@@ -574,6 +578,12 @@ class CustomApplicationContext : ApplicationContext
     private static void BackupTimer_Tick(object sender, EventArgs e)
     {
         string filePath = Program.TickFolderSource;
+
+        // Write to log file that the backup timer ticked. Overwrite the file if it already exists
+        using (StreamWriter sw = File.CreateText("log/backupTimerTick.log"))
+        {
+            sw.WriteLine(DateTime.Now.ToString());
+        }
 
         // Check if a list of folders to be backed up exist
         if (File.Exists(filePath))
