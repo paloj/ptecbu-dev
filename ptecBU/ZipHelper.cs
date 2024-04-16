@@ -35,23 +35,25 @@ public class FolderArchiver
 
     public static bool IsExcluded(string filePath, List<string> excludedItems)
     {
-        string normalizedPath = filePath.Replace('\\', '/') + "/";  // Ensure trailing slash for directories
+        // Normalize path to use backslashes
+        string normalizedPath = filePath.Replace('/', '\\');
         Debug.WriteLine($"Evaluating exclusion for: {normalizedPath}");
 
         foreach (var pattern in excludedItems)
         {
-            // Convert wildcard pattern to regex, making sure to handle directory slashes correctly
-            string modifiedPattern = Regex.Escape(pattern)
-                                          .Replace("\\*", ".*") // Replace '*' with '.*' for regex
-                                          .Replace("\\?", ".")  // Replace '?' with '.' for regex
-                                          .Replace("\\\\", "/"); // Replace '\\' with '/' for regex
+            // Properly escape the pattern and replace wildcard characters
+            string regexPattern = Regex.Escape(pattern)
+                                     .Replace("\\*", ".*") // Replace '*' with '.*' for regex
+                                     .Replace("\\?", ".")  // Replace '?' with '.' for regex
+                                     .Replace("\\\\", "\\\\"); // Ensure backslashes are escaped correctly
 
-            if (pattern.EndsWith("\\"))  // If the pattern is meant to match directories
+            // If the pattern is directory-specific, it should match any part of the path
+            if (pattern.Trim().EndsWith("\\"))
             {
-                modifiedPattern += "$";  // Match only up to the end of the directory path
+                regexPattern += ".*";  // Allow anything to follow after the directory name
             }
 
-            string regexPattern = "^" + modifiedPattern;
+            regexPattern = "^" + regexPattern + "$"; // Match the whole path
             Debug.WriteLine($"Matching against pattern: {pattern} => Regex: {regexPattern} for path: {normalizedPath}");
 
             if (Regex.IsMatch(normalizedPath, regexPattern, RegexOptions.IgnoreCase))
@@ -62,8 +64,10 @@ public class FolderArchiver
         }
 
         Debug.WriteLine($"Included: {normalizedPath}");
-        return false; // No exclusion patterns matched, do not exclude this file or directory
+        return false; // No exclusion patterns matched
     }
+
+
 
     // Read Global Config
     private void ReadConfig()
@@ -314,7 +318,17 @@ public class FolderArchiver
         using (ZipArchive archive = ZipFile.OpenRead(latestZipFilePath))
         {
             // Create a dictionary of zip entries with their last write times
-            var zipEntries = archive.Entries.ToDictionary(entry => entry.FullName, entry => entry.LastWriteTime.DateTime);
+            // Normalize paths in the zipEntries dictionary to use forward slashes
+            var zipEntries = archive.Entries.ToDictionary(
+                entry => entry.FullName.Replace('\\', '/'), // Replace backslashes with forward slashes
+                entry => entry.LastWriteTime.DateTime
+            );
+
+            // Debug print all entries in the zip archive
+            foreach (var entry in zipEntries)
+            {
+                Debug.WriteLine($"Archive entry: {entry.Key}, LastWriteTime: {entry.Value}");
+            }
 
             // Check if any new files or modified files are present in the folder. Skip excluded items.
             foreach (string filePath in Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories))
@@ -324,13 +338,23 @@ public class FolderArchiver
                     .Replace('\\', '/') // Use forward slashes
                     .TrimStart('/'); // Ensure no leading slash
 
-                // Debug.WriteLine($"Checking file: {relativePath}");
+                Debug.WriteLine($"Checking file: {relativePath}");
 
                 // Check if the local file exists in the zip archive if it's not an excluded item
                 if (excludedItems.Contains(relativePath))
                 {
                     Debug.WriteLine($"Excluded item found: {relativePath}");
                     continue; // Skip excluded items
+                }
+
+                if (IsExcluded(filePath, excludedItems))
+                {
+                    Debug.WriteLine($"Excluded item found: {relativePath}");
+                    continue; // Skip excluded items
+                }
+                else
+                {
+                    Debug.WriteLine($"Included item found: {relativePath}");
                 }
 
                 // Check if the file is new or modified
