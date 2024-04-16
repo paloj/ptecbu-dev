@@ -1077,29 +1077,36 @@ public class FolderArchiver
         return excludedItems;
     }
 
-    private bool IsExcluded(string filePath, List<string> excludedItems)
+    public static bool IsExcluded(string filePath, List<string> excludedItems)
     {
-        // Normalize the file path to use uniform directory separators
-        string normalizedPath = filePath.Replace('\\', '/');
-
-        // Debug messages for excluded items
-        Debug.WriteLine($"Checking: {filePath} with normalized path: {normalizedPath}");
+        string normalizedPath = filePath.Replace('\\', '/') + "/";  // Ensure trailing slash for directories
+        Debug.WriteLine($"Evaluating exclusion for: {normalizedPath}");
 
         foreach (var pattern in excludedItems)
         {
-            // Convert wildcard pattern to regex, escaping special characters
-            string regexPattern = Regex.Escape(pattern)
-                                      .Replace("\\*", ".*") // Replace '*' with '.*' for regex
-                                      .Replace("\\?", ".")  // Replace '?' with '.' for regex
-                                      + ".*"; // Ensure directory exclusion covers all subdirectories and files
+            // Convert wildcard pattern to regex, making sure to handle directory slashes correctly
+            string modifiedPattern = Regex.Escape(pattern)
+                                          .Replace("\\*", ".*") // Replace '*' with '.*' for regex
+                                          .Replace("\\?", ".")  // Replace '?' with '.' for regex
+                                          .Replace("\\\\", "/"); // Replace '\\' with '/' for regex
+
+            if (pattern.EndsWith("\\"))  // If the pattern is meant to match directories
+            {
+                modifiedPattern += "$";  // Match only up to the end of the directory path
+            }
+
+            string regexPattern = "^" + modifiedPattern;
+            Debug.WriteLine($"Matching against pattern: {pattern} => Regex: {regexPattern} for path: {normalizedPath}");
 
             if (Regex.IsMatch(normalizedPath, regexPattern, RegexOptions.IgnoreCase))
             {
-                Debug.WriteLine($"Excluded by regex match: {filePath}");
-                return true;
+                Debug.WriteLine($"Excluded by regex match: {normalizedPath} against pattern: {pattern}");
+                return true; // This file or directory matches an exclusion pattern
             }
         }
-        return false;
+
+        Debug.WriteLine($"Included: {normalizedPath}");
+        return false; // No exclusion patterns matched, do not exclude this file or directory
     }
 
     // Read Global Config
@@ -1260,7 +1267,7 @@ public class FolderArchiver
                             CompressionLevel.Optimal,
                             true,
                             Encoding.UTF8,
-                            fileName => !IsExcluded(fileName, excludedItems)
+                            fileName => !IsExcluded(fileName, excludedItems)  // Should include items not excluded
                         );
 
                         if (prompt)
@@ -1535,12 +1542,12 @@ public class FolderArchiver
 public static class ZipHelper
 {
     public static void CreateFromDirectory(
-        string sourceDirectoryName,
-        string destinationArchiveFileName,
-        CompressionLevel compressionLevel,
-        bool includeBaseDirectory,
-        Encoding entryNameEncoding,
-        Predicate<string> filter)
+    string sourceDirectoryName,
+    string destinationArchiveFileName,
+    CompressionLevel compressionLevel,
+    bool includeBaseDirectory,
+    Encoding entryNameEncoding,
+    Predicate<string> filter)
     {
         if (string.IsNullOrEmpty(sourceDirectoryName))
             throw new ArgumentNullException(nameof(sourceDirectoryName));
@@ -1557,27 +1564,26 @@ public static class ZipHelper
         {
             for (int i = 0; i < filesToAdd.Count; i++)
             {
-                if (!filter(filesToAdd[i]))
-                {
-                    continue;
-                }
+                Debug.WriteLine($"Evaluating file {filesToAdd[i]} for inclusion in archive.");
+                // File inclusion check is now unnecessary here because we've already filtered in AddFilesRecursively
                 archive.CreateEntryFromFile(filesToAdd[i], entryNames[i], compressionLevel);
+                Debug.WriteLine($"Adding file to archive: {filesToAdd[i]}");
             }
         }
     }
 
     private static void AddFilesRecursively(string currentDir, List<string> filesToAdd, Predicate<string> filter)
     {
-        // Log entering the directory
-        Debug.WriteLine($"Processing directory: {currentDir}");
+        // Check if the current directory itself should be excluded
+        if (!filter(currentDir))
+        {
+            Debug.WriteLine($"Excluding directory and its contents: {currentDir}");
+            return; // Skip this directory and all its contents
+        }
 
-        // Process each file in the current directory
         foreach (var file in Directory.GetFiles(currentDir))
         {
-            // Normalize file path for consistent filtering
-            string normalizedFile = file.Replace('\\', '/');
-            // Log processing of the file
-            if (!filter(normalizedFile))
+            if (filter(file))
             {
                 filesToAdd.Add(file);
                 Debug.WriteLine($"Included file: {file}");
@@ -1588,19 +1594,10 @@ public static class ZipHelper
             }
         }
 
-        // Recursively process subdirectories
         foreach (var directory in Directory.GetDirectories(currentDir))
         {
-            // Normalize directory path for consistent filtering
-            string normalizedDir = directory.Replace('\\', '/');
-            if (!filter(normalizedDir))
-            {
-                AddFilesRecursively(directory, filesToAdd, filter);
-            }
-            else
-            {
-                Debug.WriteLine($"Excluded directory: {directory}");
-            }
+            Debug.WriteLine($"Processing subdirectory: {directory}");
+            AddFilesRecursively(directory, filesToAdd, filter);
         }
     }
 
