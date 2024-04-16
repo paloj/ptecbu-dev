@@ -1079,7 +1079,27 @@ public class FolderArchiver
 
     private bool IsExcluded(string filePath, List<string> excludedItems)
     {
-        return excludedItems.Any(exclude => filePath.Contains(exclude));
+        // Normalize the file path to use uniform directory separators
+        string normalizedPath = filePath.Replace('\\', '/');
+
+        // Debug messages for excluded items
+        Debug.WriteLine($"Checking: {filePath} with normalized path: {normalizedPath}");
+
+        foreach (var pattern in excludedItems)
+        {
+            // Convert wildcard pattern to regex, escaping special characters
+            string regexPattern = Regex.Escape(pattern)
+                                      .Replace("\\*", ".*") // Replace '*' with '.*' for regex
+                                      .Replace("\\?", ".")  // Replace '?' with '.' for regex
+                                      + ".*"; // Ensure directory exclusion covers all subdirectories and files
+
+            if (Regex.IsMatch(normalizedPath, regexPattern, RegexOptions.IgnoreCase))
+            {
+                Debug.WriteLine($"Excluded by regex match: {filePath}");
+                return true;
+            }
+        }
+        return false;
     }
 
     // Read Global Config
@@ -1242,8 +1262,6 @@ public class FolderArchiver
                             Encoding.UTF8,
                             fileName => !IsExcluded(fileName, excludedItems)
                         );
-
-                        //ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
 
                         if (prompt)
                         { // Only display the status if the prompt is shown (not when the process is run in the background}
@@ -1529,13 +1547,15 @@ public static class ZipHelper
         if (string.IsNullOrEmpty(destinationArchiveFileName))
             throw new ArgumentNullException(nameof(destinationArchiveFileName));
 
-        var filesToAdd = Directory.GetFiles(sourceDirectoryName, "*", SearchOption.AllDirectories);
-        var entryNames = GetEntryNames(filesToAdd, sourceDirectoryName, includeBaseDirectory);
+        var filesToAdd = new List<string>();
+        AddFilesRecursively(sourceDirectoryName, filesToAdd, filter);
+
+        var entryNames = GetEntryNames(filesToAdd.ToArray(), sourceDirectoryName, includeBaseDirectory);
 
         using (var zipFileStream = new FileStream(destinationArchiveFileName, FileMode.Create))
         using (var archive = new ZipArchive(zipFileStream, ZipArchiveMode.Create))
         {
-            for (int i = 0; i < filesToAdd.Length; i++)
+            for (int i = 0; i < filesToAdd.Count; i++)
             {
                 if (!filter(filesToAdd[i]))
                 {
@@ -1545,6 +1565,45 @@ public static class ZipHelper
             }
         }
     }
+
+    private static void AddFilesRecursively(string currentDir, List<string> filesToAdd, Predicate<string> filter)
+    {
+        // Log entering the directory
+        Debug.WriteLine($"Processing directory: {currentDir}");
+
+        // Process each file in the current directory
+        foreach (var file in Directory.GetFiles(currentDir))
+        {
+            // Normalize file path for consistent filtering
+            string normalizedFile = file.Replace('\\', '/');
+            // Log processing of the file
+            if (!filter(normalizedFile))
+            {
+                filesToAdd.Add(file);
+                Debug.WriteLine($"Included file: {file}");
+            }
+            else
+            {
+                Debug.WriteLine($"Excluded file: {file}");
+            }
+        }
+
+        // Recursively process subdirectories
+        foreach (var directory in Directory.GetDirectories(currentDir))
+        {
+            // Normalize directory path for consistent filtering
+            string normalizedDir = directory.Replace('\\', '/');
+            if (!filter(normalizedDir))
+            {
+                AddFilesRecursively(directory, filesToAdd, filter);
+            }
+            else
+            {
+                Debug.WriteLine($"Excluded directory: {directory}");
+            }
+        }
+    }
+
 
     private static string[] GetEntryNames(string[] filesToAdd, string sourceDirectoryName, bool includeBaseDirectory)
     {
