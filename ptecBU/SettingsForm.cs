@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using Microsoft.VisualBasic;
 using System.Text.RegularExpressions;
+using System.Text;
 
 class SettingsForm : Form
 {
@@ -45,7 +46,8 @@ class SettingsForm : Form
         ShowAlways = true
     };
 
-    private ToolTip LabelToolTip = new(){
+    private ToolTip LabelToolTip = new()
+    {
         AutoPopDelay = 5000,
         InitialDelay = 100,
         ReshowDelay = 500,
@@ -1052,12 +1054,32 @@ public class FolderArchiver
 {
     private Label statusLabel;
     private string destinationPath;
+    private const string ExcludedItemsPath = "excludedItems.txt";
     private const string LogFilePath = "log/archive_err.log";
 
     public FolderArchiver(Label statusLabel = null)
     {
         this.statusLabel = statusLabel;
         ReadConfig();
+    }
+
+    public List<string> LoadExcludedItems()
+    {
+        var excludedItems = new List<string>();
+        if (File.Exists(ExcludedItemsPath))
+        {
+            excludedItems = new List<string>(File.ReadAllLines(ExcludedItemsPath));
+        }
+        else
+        {
+            Debug.WriteLine("Excluded items file not found.");
+        }
+        return excludedItems;
+    }
+
+    private bool IsExcluded(string filePath, List<string> excludedItems)
+    {
+        return excludedItems.Any(exclude => filePath.Contains(exclude));
     }
 
     // Read Global Config
@@ -1124,10 +1146,15 @@ public class FolderArchiver
     {
         try
         {
+            // Read the list of folders to archive
             var folders = File.ReadAllLines("folders.txt");
             int totalFolders = folders.Length;  // Total number of folders
             int currentFolderIndex = 0;         // Initialize a counter to keep track of the current folder index
 
+            // Load excluded items. The items can be folders or files or file types or partial names
+            var excludedItems = LoadExcludedItems();
+
+            // Load folder configs
             var folderConfigs = FolderConfigManager.LoadFolderConfigs();
             var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
@@ -1144,13 +1171,13 @@ public class FolderArchiver
                     FolderConfig folderConfig = LoadFolderSettings(folder, globalConfig);
 
                     // Check if a new archive should be created for the folder. If not, skip archiving
-                    if (ShouldCreateNewArchive(folder, folderConfig, globalConfig))
+                    if (ShouldCreateNewArchive(folder, folderConfig, globalConfig, excludedItems))
                     {
                         // Update UI if prompt is true
                         if (prompt)
                         {
                             // Calculate the total size of the files in the folder
-                            long totalSize = CalculateFolderSize(folder);
+                            long totalSize = CalculateFolderSize(folder, excludedItems);
 
                             // Convert total size to gigabytes
                             double totalSizeGB = totalSize / (1024.0 * 1024.0 * 1024.0);
@@ -1180,7 +1207,7 @@ public class FolderArchiver
                         { // Only display the status if the prompt is shown (not when the process is run in the background}
                             UpdateStatusLabel($"Archiving ({currentFolderIndex}/{totalFolders}): {folder}");
                         }
-                        
+
                         // Set the base filename for the zip archive
                         string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
                         int version = 1;
@@ -1206,8 +1233,18 @@ public class FolderArchiver
                         string zipFileName = $"{baseFileName} V{version}.zip";
                         var zipFilePath = Path.Combine(destinationPath, zipFileName);
 
-                        // Create a new zip archive for the folder
-                        ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
+                        // Create a new zip archive for the folder. Skip excluded items.
+                        ZipHelper.CreateFromDirectory(
+                            folder,
+                            zipFilePath,
+                            CompressionLevel.Optimal,
+                            true,
+                            Encoding.UTF8,
+                            fileName => !IsExcluded(fileName, excludedItems)
+                        );
+
+                        //ZipFile.CreateFromDirectory(folder, zipFilePath, CompressionLevel.Optimal, true);
+
                         if (prompt)
                         { // Only display the status if the prompt is shown (not when the process is run in the background}
                             UpdateStatusLabel($"Completed: {folder}");
@@ -1262,7 +1299,7 @@ public class FolderArchiver
         }
     }
 
-    private bool ShouldCreateNewArchive(string folderPath, FolderConfig folderConfig, Dictionary<string, string> globalConfig)
+    private bool ShouldCreateNewArchive(string folderPath, FolderConfig folderConfig, Dictionary<string, string> globalConfig, List<string> excludedItems)
     {
         // Check if folder is set to use global settings and if includeZipInBackup=false in global settings
         if (folderConfig?.BackupOption == BackupOptions.UseGlobalSetting)
@@ -1295,8 +1332,10 @@ public class FolderArchiver
 
         using (ZipArchive archive = ZipFile.OpenRead(latestZipFilePath))
         {
+            // Create a dictionary of zip entries with their last write times
             var zipEntries = archive.Entries.ToDictionary(entry => entry.FullName, entry => entry.LastWriteTime.DateTime);
 
+            // Check if any new files or modified files are present in the folder. Skip excluded items.
             foreach (string filePath in Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories))
             {
                 FileInfo localFile = new FileInfo(filePath);
@@ -1306,7 +1345,14 @@ public class FolderArchiver
 
                 // Debug.WriteLine($"Checking file: {relativePath}");
 
-                // Check if the local file exists in the zip archive
+                // Check if the local file exists in the zip archive if it's not an excluded item
+                if (excludedItems.Contains(relativePath))
+                {
+                    Debug.WriteLine($"Excluded item found: {relativePath}");
+                    continue; // Skip excluded items
+                }
+
+                // Check if the file is new or modified
                 if (!zipEntries.ContainsKey(relativePath))
                 {
                     Debug.WriteLine($"New file found, not present in archive: {relativePath}");
@@ -1422,8 +1468,7 @@ public class FolderArchiver
     }
 
 
-
-    private long CalculateFolderSize(string folder)
+    private long CalculateFolderSize(string folder, List<string> excludedItems)
     {
         UpdateStatusLabel($"Estimating size of: {folder}");
 
@@ -1432,6 +1477,12 @@ public class FolderArchiver
         string[] files = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
         foreach (string file in files)
         {
+            // Skip excluded items
+            if (excludedItems.Any(excluded => file.Contains(excluded)))
+            {
+                continue;
+            }
+
             FileInfo fileInfo = new FileInfo(file);
             totalSize += fileInfo.Length;
         }
@@ -1460,6 +1511,53 @@ public class FolderArchiver
         {
             // Optionally handle logging errors, but be careful to avoid recursive error logging.
         }
+    }
+}
+
+public static class ZipHelper
+{
+    public static void CreateFromDirectory(
+        string sourceDirectoryName,
+        string destinationArchiveFileName,
+        CompressionLevel compressionLevel,
+        bool includeBaseDirectory,
+        Encoding entryNameEncoding,
+        Predicate<string> filter)
+    {
+        if (string.IsNullOrEmpty(sourceDirectoryName))
+            throw new ArgumentNullException(nameof(sourceDirectoryName));
+        if (string.IsNullOrEmpty(destinationArchiveFileName))
+            throw new ArgumentNullException(nameof(destinationArchiveFileName));
+
+        var filesToAdd = Directory.GetFiles(sourceDirectoryName, "*", SearchOption.AllDirectories);
+        var entryNames = GetEntryNames(filesToAdd, sourceDirectoryName, includeBaseDirectory);
+
+        using (var zipFileStream = new FileStream(destinationArchiveFileName, FileMode.Create))
+        using (var archive = new ZipArchive(zipFileStream, ZipArchiveMode.Create))
+        {
+            for (int i = 0; i < filesToAdd.Length; i++)
+            {
+                if (!filter(filesToAdd[i]))
+                {
+                    continue;
+                }
+                archive.CreateEntryFromFile(filesToAdd[i], entryNames[i], compressionLevel);
+            }
+        }
+    }
+
+    private static string[] GetEntryNames(string[] filesToAdd, string sourceDirectoryName, bool includeBaseDirectory)
+    {
+        var entryNames = new string[filesToAdd.Length];
+        for (int i = 0; i < filesToAdd.Length; i++)
+        {
+            var path = filesToAdd[i].Substring(sourceDirectoryName.Length).TrimStart(Path.DirectorySeparatorChar);
+            if (includeBaseDirectory)
+                path = Path.Combine(Path.GetFileName(sourceDirectoryName), path);
+
+            entryNames[i] = path;
+        }
+        return entryNames;
     }
 }
 
