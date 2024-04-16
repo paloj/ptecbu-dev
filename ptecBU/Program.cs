@@ -1,10 +1,5 @@
 // Build command
 // dotnet publish -c Release -r win10-x64 --self-contained false
-using System;
-using System.IO;
-using System.Drawing;
-using System.Linq;
-using System.Windows.Forms;
 using Microsoft.Win32;
 using System.Diagnostics;
 

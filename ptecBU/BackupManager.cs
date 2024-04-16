@@ -1,12 +1,8 @@
-using System;
 using System.Diagnostics;
-using System.IO;
 using System.Security.Cryptography;
-using System.Linq;
 using System.Text;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 public class BackupManager
 {
@@ -328,7 +324,7 @@ public class BackupManager
             // Add zip to backup if enabled in config.ini and not set to only make zip backups
             if (!IsOnlyMakeZipBackupEnabled())
             {
-                // Call the zip function from SettignsForm.cs
+                // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
                 var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class
                 Task.Run(() => archiver.ArchiveFolders(false));     // Run the archiver in a separate thread
             }
@@ -519,27 +515,6 @@ public class BackupManager
         return DateTime.Now - lastBackup > TimeSpan.FromDays(30);
     }
 
-    /* USING DEFINED HOURS FROM CONFIG.INI INSTEAD OF HARDCODED 1 DAY.
-        public static bool IsLastBackupOlderThanOneDay()
-        {
-            if (!File.Exists("log/lastBackup.log"))
-            {
-                // If the file doesn't exist, assume the last backup was more than a day ago
-                return true;
-            }
-
-            string timestampStr = File.ReadAllText("log/lastBackup.log");
-            DateTime lastBackup;
-            if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
-            {
-                // If the timestamp can't be parsed, assume the last backup was more than a day ago
-                return true;
-            }
-
-            // Check if the last backup was more than a day ago
-            return DateTime.Now - lastBackup > TimeSpan.FromDays(1);
-        }
-    */
     public static bool IsLastBackupOlderThanConfigHours() // Check if the last backup was older than the defined hours in config.ini
     {
         string[] lines = File.ReadAllLines("config.ini");
