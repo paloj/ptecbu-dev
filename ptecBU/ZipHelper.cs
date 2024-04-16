@@ -1,10 +1,48 @@
-
-
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+
+public class FileInfoItem
+{
+    public string FilePath { get; set; }
+    public DateTime LastModified { get; set; }
+    public bool IsExcluded { get; set; }
+}
+
+public class DirectoryProcessingService
+{
+    private readonly FolderArchiver _folderArchiver;
+
+    public DirectoryProcessingService(FolderArchiver folderArchiver)
+    {
+        _folderArchiver = folderArchiver;
+    }
+
+    public async Task ProcessDirectoriesAsync(List<string> directories, List<string> excludedPatterns)
+    {
+        var tasks = directories.Select(dir => ScanAndProcessDirectoryAsync(dir, excludedPatterns)).ToList();
+        var results = await Task.WhenAll(tasks);
+
+        // Debug output to verify the lists
+        foreach (var result in results)
+        {
+            Console.WriteLine("Processed Directory:");
+            foreach (var file in result)
+            {
+                Console.WriteLine(file);
+            }
+        }
+    }
+
+    private async Task<List<string>> ScanAndProcessDirectoryAsync(string directoryPath, List<string> excludedPatterns)
+    {
+        return await _folderArchiver.ScanDirectoryAsync(directoryPath, excludedPatterns);
+    }
+}
+
+
 
 public class FolderArchiver
 {
@@ -31,6 +69,23 @@ public class FolderArchiver
             Debug.WriteLine("Excluded items file not found.");
         }
         return excludedItems;
+    }
+
+    public async Task<List<string>> ScanDirectoryAsync(string directoryPath, List<string> excludedPatterns)
+    {
+        List<string> filesList = new List<string>();
+        await Task.Run(() =>
+        {
+            var files = Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories);
+            foreach (var file in files)
+            {
+                if (!IsExcluded(file, excludedPatterns))
+                {
+                    filesList.Add(file);
+                }
+            }
+        });
+        return filesList;
     }
 
     public static bool IsExcluded(string filePath, List<string> excludedItems)
@@ -66,8 +121,6 @@ public class FolderArchiver
         Debug.WriteLine($"Included: {normalizedPath}");
         return false; // No exclusion patterns matched
     }
-
-
 
     // Read Global Config
     private void ReadConfig()
@@ -131,6 +184,10 @@ public class FolderArchiver
 
     public void ArchiveFolders(bool prompt = true)
     {
+        // Start timer to measure the time taken for archiving
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+
         try
         {
             // Read the list of folders to archive
@@ -281,6 +338,10 @@ public class FolderArchiver
         {
             // Stop blinking tray icon
             Program.StopBlinking();
+
+            // Stop the timer and log the time taken for archiving
+            stopwatch.Stop();
+            Debug.WriteLine($"Archiving completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
         }
     }
 
