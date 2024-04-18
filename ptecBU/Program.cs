@@ -72,7 +72,14 @@ static class Program
         if (args.Contains("-now"))
         {
             // Perform backup with the custom destination if provided
-            await BackupManager.PerformBackup(customDestination, FolderSource, ExcludeListSource, true);
+            try
+            {
+                await BackupManager.PerformBackup(customDestination, FolderSource, ExcludeListSource, true);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
         }
         else
         {
@@ -192,7 +199,14 @@ static class Program
         IsBackupInProgress = true;
         Task.Run(async () =>
         {
-            await BackupManager.PerformBackup(customDestination);
+            try
+            {
+                await BackupManager.PerformBackup(customDestination);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
             
             // Update UI from the UI thread
             trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
@@ -227,7 +241,14 @@ static class Program
         }
 
         // Reset backup status and update tray menu as necessary
-        await StopBlinking();
+        try
+        {
+            await StopBlinking();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(ex.Message);
+        }
         UpdateTrayMenuItem();
     }
 
@@ -338,7 +359,14 @@ static class Program
     {
         // Stop the blinking
         IsBackupInProgress = false;
-        await BackupManager.BlinkTrayIconAsync(false);
+        try
+        {
+            await BackupManager.BlinkTrayIconAsync(false);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(ex.Message);
+        }
         // Update tray icon tooltip after backup completion
         UpdateTrayIconTooltip();
         // Check if the icon is set to green. If not, set it to green
@@ -559,7 +587,7 @@ class CustomApplicationContext : ApplicationContext
             if (lines.Length >= 1)
             {
                 // Check if the last backup was over 24 hours ago and no backup is currently in progress
-                if (BackupManager.IsLastBackupOlderThanConfigHours() && !BackupManager.isBlinking)
+                if (BackupManager.IsLastBackupOlderThanConfigHours() && !Program.IsBackupInProgress)
                 {
                     // Check if a connection to the backup location exists
                     if (BackupManager.IsBackupLocationReachable())
@@ -585,7 +613,15 @@ class CustomApplicationContext : ApplicationContext
                         Program.IsBackupInProgress = true;
                         Task.Run(async () =>
                         {
-                            await BackupManager.PerformBackup(tickDestination);
+                            try
+                            {
+                                Debug.WriteLine("Backup timer ticked and starting backup process.");
+                                await BackupManager.PerformBackup(tickDestination);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine("Backup timer ticked and backup process failed: " + ex.Message);
+                            }
                         });
                         Program.UpdateTrayIconTooltip();
                         Program.UpdateTrayMenuItem();
@@ -611,6 +647,7 @@ class CustomApplicationContext : ApplicationContext
             trayIcon.Visible = false;
             // Dispose of the tray icon
             trayIcon?.Dispose();
+            BackupManager.DisposeIcons();
         }
         base.Dispose(disposing);
     }

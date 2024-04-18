@@ -23,8 +23,16 @@ public class DirectoryProcessingService
     public async Task ProcessDirectoriesAsync(List<string> directories, List<string> excludedPatterns)
     {
         var tasks = directories.Select(dir => ScanAndProcessDirectoryAsync(dir, excludedPatterns)).ToList();
-        var results = await Task.WhenAll(tasks);
-
+        var results = new List<string>[tasks.Count];    // Array to store the results of each task
+        try
+        {
+            results = await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing directories: {ex.Message}");
+        }
+        
         // Debug output to verify the lists
         foreach (var result in results)
         {
@@ -74,18 +82,30 @@ public class FolderArchiver
     public async Task<List<string>> ScanDirectoryAsync(string directoryPath, List<string> excludedPatterns)
     {
         List<string> filesList = new List<string>();
-        await Task.Run(() =>
-        {
-            var files = Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories);
-            foreach (var file in files)
+        try
+        {            
+            await Task.Run(() =>
             {
-                if (!IsExcluded(file, excludedPatterns))
+                var files = Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories);
+                foreach (var file in files)
                 {
-                    filesList.Add(file);
+                    if (!IsExcluded(file, excludedPatterns))
+                    {
+                        filesList.Add(file);
+                    }
                 }
+            });
+            return filesList;
+        }
+        catch (Exception ex)
+        {
+            LogError($"Error scanning directory: {ex.Message}");
+            if (statusLabel != null)
+            {
+                UpdateStatusLabel($"Error scanning directory: {ex.Message}");
             }
-        });
-        return filesList;
+            return filesList;
+        }
     }
 
     public static bool IsExcluded(string filePath, List<string> excludedItems)

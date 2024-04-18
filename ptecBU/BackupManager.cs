@@ -9,6 +9,12 @@ public class BackupManager
     static string hostname = Environment.MachineName;
     static string Destination = GetBackupDestination();
 
+    public static bool IsBlinking { get; private set; }
+    private static CancellationTokenSource BlinkCancellationTokenSource;
+    private static Task BlinkTask;
+    private static Icon GreenIcon;
+    private static Icon YellowIcon;
+
     public static string GetBackupDestination()
     {
         string configPath = "config.ini";
@@ -30,20 +36,22 @@ public class BackupManager
         return Path.Combine(defaultValue, hostname);
     }
 
-
-    public static void Initialize(string customDestination)
-    {
-        // Append the hostname to the customDestination before setting the Destination
-        Destination = customDestination != null ? Path.Combine(customDestination, hostname) : GetBackupDestination();
-    }
-
     public static async Task PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
     {
         // Start blinking tray icon to indicate backup is in progress
         Program.IsBackupInProgress = true;
         // Start blinking the tray icon to indicate the backup process has started
         Debug.WriteLine("Blinking tray icon to indicate backup process has started.");
-        await BlinkTrayIconAsync(true);
+        GreenIcon = new Icon("Resources/green.ico");
+        YellowIcon = new Icon("Resources/yellow.ico");
+        try
+        {
+            await BlinkTrayIconAsync(true);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
+        }
 
         // Load global settings
         var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
@@ -55,7 +63,15 @@ public class BackupManager
         if (IsOnlyMakeZipBackupEnabled())
         {
             var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
-            await Task.Run(() => archiver.ArchiveFolders(false)); // Run the zip archive process in a separate thread and await its completion
+            try
+            {
+                // Run the zip archive process in a separate thread and await its completion
+                await Task.Run(() => archiver.ArchiveFolders(false));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error archiving folders: {ex.Message}");
+            }
         }
         else
         {
@@ -86,7 +102,14 @@ public class BackupManager
             if (!Program.IsRunningWithArguments)
             {
                 // Start blinking the tray icon to indicate the backup process has started
-                await BlinkTrayIconAsync(true);
+                try
+                {
+                    await BlinkTrayIconAsync(true);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
+                }
                 Program.trayIcon.Text = "Backup in progress";
             }
 
@@ -249,7 +272,14 @@ public class BackupManager
                     if (Program.RobocopyProcess == null)
                     {
                         // Stop blinking the tray icon to indicate the backup process has completed
-                        await BlinkTrayIconAsync(false);
+                        try
+                        {
+                            await BlinkTrayIconAsync(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
+                        }
                         Program.IsBackupInProgress = false;
 
                         if (exitAfter)
@@ -328,7 +358,14 @@ public class BackupManager
             {
                 // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
                 var archiver = new FolderArchiver();                    // Create a new instance of the FolderArchiver class
-                await Task.Run(() => archiver.ArchiveFolders(false));   // Run the archiver in a separate thread
+                try
+                {
+                    await Task.Run(() => archiver.ArchiveFolders(false));   // Run the archiver in a separate thread
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error archiving folders: {ex.Message}");
+                }
             }
         }
 
@@ -434,74 +471,57 @@ public class BackupManager
     }
 
 
-    public static bool isBlinking = false;
-    private static CancellationTokenSource blinkingCancellationTokenSource;
-    private static Task blinkingTask;
-
     public static async Task BlinkTrayIconAsync(bool start)
     {
-        string greenIconPath = "Resources/green.ico";
-        string yellowIconPath = "Resources/yellow.ico";
-        int iconDuration = 500; // 0.5 seconds
+        int iconDuration = 500; // Duration to wait before switching icons
 
-        // Load icons only once
-        Debug.WriteLine("Loading icons for blinking.");
-        using Icon greenIcon = new Icon(greenIconPath);
-        using Icon yellowIcon = new Icon(yellowIconPath);
-
-        if (start && !isBlinking)
+        if (start && !IsBlinking)
         {
-            isBlinking = true;
-            blinkingCancellationTokenSource = new CancellationTokenSource();
+            IsBlinking = true;
+            BlinkCancellationTokenSource = new CancellationTokenSource();
 
-            Debug.WriteLine("Starting blinking task.");
-            blinkingTask = Task.Run(async () =>
+            BlinkTask = Task.Run(async () =>
             {
-                bool isGreenIconVisible = true;
                 try
                 {
-                    while (isBlinking && !blinkingCancellationTokenSource.Token.IsCancellationRequested)
+                    while (!BlinkCancellationTokenSource.IsCancellationRequested)
                     {
-                        Program.trayIcon.Icon = isGreenIconVisible ? greenIcon : yellowIcon;
-                        await Task.Delay(iconDuration, blinkingCancellationTokenSource.Token);
-                        isGreenIconVisible = !isGreenIconVisible;
+                        Program.trayIcon.Icon = Program.trayIcon.Icon == GreenIcon ? YellowIcon : GreenIcon;
+                        await Task.Delay(iconDuration, BlinkCancellationTokenSource.Token);
                     }
-                }
-                catch (TaskCanceledException)
-                {
-                    // Handle the task being cancelled
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Error occurred during blinking: {ex.Message}");
-                    // Log or handle exceptions that might occur during blinking
-                }
-                finally
-                {
-                    // Ensure the original icon is set back once blinking stops
-                    Program.trayIcon.Icon = greenIcon;
-                    isBlinking = false;
-                }
-            }, blinkingCancellationTokenSource.Token);
-        }
-        else if (!start && isBlinking)
-        {
-            isBlinking = false;
-            blinkingCancellationTokenSource?.Cancel();
-            if (blinkingTask != null)
-            {
-                try
-                {
-                    await blinkingTask; // Ensure task is properly awaited and completed
                 }
                 catch (OperationCanceledException)
                 {
-                    // Handle expected cancellation
+                    // Handle the cancellation of the blinking
+                    Program.trayIcon.Icon = GreenIcon; // Ensure icon is set to default state when stopped
                 }
+                finally
+                {
+                    IsBlinking = false;
+                }
+            }, BlinkCancellationTokenSource.Token);
+        }
+        else if (!start && IsBlinking)
+        {
+            BlinkCancellationTokenSource.Cancel();
+            try
+            {
+                await BlinkTask; // Ensure the task completes before proceeding
             }
+            catch (OperationCanceledException)
+            {
+                // Handle the cancellation of the blinking
+            }
+            Program.trayIcon.Icon = GreenIcon; // Reset to default icon when stopped
         }
     }
 
+    public static void DisposeIcons()
+    {
+        GreenIcon?.Dispose();
+        YellowIcon?.Dispose();
+    }
+    
     public static bool IsLastBackupOlderThanOneMonth()   // Check if the last backup was more than a month ago
     {
         if (!File.Exists("log/lastBackup.log"))
