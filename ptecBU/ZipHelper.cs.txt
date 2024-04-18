@@ -88,7 +88,7 @@ public class FolderArchiver
             }
 
             regexPattern = "^" + regexPattern + "$"; // Match the whole path
-            //Debug.WriteLine($"Matching against pattern: {pattern} => Regex: {regexPattern} for path: {normalizedPath}");
+            Debug.WriteLine($"Matching against pattern: {pattern} => Regex: {regexPattern} for path: {normalizedPath}");
 
             if (Regex.IsMatch(normalizedPath, regexPattern, RegexOptions.IgnoreCase))
             {
@@ -190,9 +190,9 @@ public class FolderArchiver
                 {
                     var folderConfig = LoadFolderSettings(folder, globalConfig); // Load folder settings
                     Debug.WriteLine($"Processing folder: {folder}");
-                    var filteredFiles = await ScanDirectoryAsync(folder, excludedItems); // Scan the directory asynchronously and return a list of files that are not excluded
-                    Debug.WriteLine($"Files found in folder {folder}: {filteredFiles.Count}");
-                    return filteredFiles.Select(file => new FileInfoItem
+                    var files = await ScanDirectoryAsync(folder, excludedItems); // Scan the directory asynchronously and return a list of files that are not excluded
+                    Debug.WriteLine($"Files found in folder {folder}: {files.Count}");
+                    return files.Select(file => new FileInfoItem
                     {
                         FilePath = file,
                         LastModified = File.GetLastWriteTime(file),
@@ -218,7 +218,7 @@ public class FolderArchiver
                 }
             }
 
-            // Now use ShouldCreateNewArchive Async to determine if a new archive should be created for each folder
+            // Now use ShouldCreateNewArchiveAsync to determine if a new archive should be created for each folder
             var semaphore = new SemaphoreSlim(5); // Limit to 5 concurrent tasks if needed
 
             var archiveTasks = folders.Select(async (folder, index) =>
@@ -229,7 +229,7 @@ public class FolderArchiver
                     var folderConfig = LoadFolderSettings(folder, globalConfig); // Load folder settings
                     var files = results[index]; // Get the list of files for the folder
                     Debug.WriteLine($"Starting to check archive necessity for folder: {folder} with {files.Count} files.");
-                    bool needsArchive = await ShouldCreateNewArchiveAsync(folder, files, folderConfig, globalConfig);
+                    bool needsArchive = await ShouldCreateNewArchiveAsync(folder, folderConfig, globalConfig, excludedItems);
                     Debug.WriteLine($"Archive check complete for {folder}: " + (needsArchive ? "New archive needed." : "No new archive needed."));
                     return needsArchive;
                 }
@@ -305,12 +305,6 @@ public class FolderArchiver
 
             var folder = folders[i];
             var files = fileLists[i]; // List of FileInfoItem
-
-            if (!files.Any(file => !file.IsExcluded))
-            {
-                Debug.WriteLine($"No files to archive in folder {folder}. Skipping ZIP file creation.");
-                continue; // Skip ZIP creation as there are no files to include
-            }
 
             Debug.WriteLine($"Archiving {folder}");
 
@@ -395,7 +389,7 @@ public class FolderArchiver
         return false;
     }
 
-    public async Task<bool> ShouldCreateNewArchiveAsync(string folderPath, List<FileInfoItem> files, FolderConfig folderConfig, Dictionary<string, string> globalConfig)
+    public async Task<bool> ShouldCreateNewArchiveAsync(string folderPath, FolderConfig folderConfig, Dictionary<string, string> globalConfig, List<string> excludedItems)
     {
         // Skip archive creation based on global settings
         if (folderConfig?.BackupOption == BackupOptions.UseGlobalSetting &&
@@ -434,11 +428,14 @@ public class FolderArchiver
                     entry => entry.FullName.Replace('\\', '/'),  // Normalize file paths
                     entry => entry.LastWriteTime.DateTime);
 
+                // Enumerate all files in the directory (assuming these files have already been filtered for exclusions)
+                var files = Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories);
                 TimeSpan tolerance = TimeSpan.FromSeconds(30);  // Define a tolerance of 30 seconds
 
-                foreach (var fileInfo in files)
+                foreach (string filePath in files)
                 {
-                    string relativePath = GetRelativePath(fileInfo.FilePath, folderPath).Replace('\\', '/').TrimStart('/');
+                    string relativePath = GetRelativePath(filePath, folderPath).Replace('\\', '/').TrimStart('/');
+                    FileInfo localFile = new FileInfo(filePath);
 
                     // Check if the file exists in the archive and compare times if it does
                     if (!zipEntries.ContainsKey(relativePath))
@@ -448,7 +445,7 @@ public class FolderArchiver
                     }
 
                     DateTime archiveTime = zipEntries[relativePath];
-                    DateTime localTime = fileInfo.LastModified;
+                    DateTime localTime = localFile.LastWriteTime;
                     Debug.WriteLine($"Comparing: {relativePath}");
                     Debug.WriteLine($"Archive time: {archiveTime}, Local time: {localTime}");
 

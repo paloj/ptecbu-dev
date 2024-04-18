@@ -148,13 +148,8 @@ static class Program
 
     private static void ShowSettingsForm()
     {
-        Thread thread = new Thread(() =>
-        {
-            var settingsForm = new SettingsForm();
-            settingsForm.ShowDialog();
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
+        var settingsForm = new SettingsForm();
+        settingsForm.ShowDialog();
     }
 
     private static void Application_ApplicationExit(object sender, EventArgs e)
@@ -203,7 +198,7 @@ static class Program
         // Start the backup process on a separate thread
         IsBackupInProgress = true;
         try
-        {
+        {    
             Task.Run(async () =>
             {
                 try
@@ -214,7 +209,7 @@ static class Program
                 {
                     Debug.WriteLine(ex.Message);
                 }
-
+                
                 // Update UI from the UI thread
                 trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
                 {
@@ -226,7 +221,7 @@ static class Program
         }
         catch (Exception ex)
         {
-            Debug.WriteLine("Error in backup task run: " + ex.Message);
+            Debug.WriteLine("Error in backup task run: "+ex.Message);
         }
 
         // Check backup progress state and update UI accordingly
@@ -264,7 +259,7 @@ static class Program
         {
             Debug.WriteLine(ex.Message);
         }
-
+        
         UpdateTrayMenuItem();
     }
 

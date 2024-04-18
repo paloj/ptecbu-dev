@@ -1,3 +1,4 @@
+using System.Windows.Forms;
 using System.Reflection;
 using System.Diagnostics;
 using System.Text.Json;
@@ -660,18 +661,15 @@ class SettingsForm : Form
     private void OnAddFolder(object sender, EventArgs e)
     {
         // Handle add folder clicked
-        using (var dialog = new FolderBrowserDialog())
+        using var dialog = new FolderBrowserDialog();
+        if (dialog.ShowDialog() == DialogResult.OK)
         {
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                // Add the selected folder to the list box
-                foldersListBox.Items.Add(dialog.SelectedPath);
-            }
+            string selectedPath = dialog.SelectedPath;
+            foldersListBox.Items.Add(selectedPath);
+            //update folders.txt file
+            WriteListBoxContentsToFile(foldersListBox, "folders.txt");
         }
-        //update folders.txt file
-        WriteListBoxContentsToFile(foldersListBox, "folders.txt");
     }
-
     private void OnRemoveFolder(object sender, EventArgs e)
     {
         // Handle remove folder clicked
@@ -839,6 +837,23 @@ class SettingsForm : Form
             }
         }
     }
+
+    private static async Task WriteListBoxContentsToFileAsync(ListBox listBox, string filePath)
+    {
+        using StreamWriter writer = new(filePath);
+        foreach (var item in listBox.Items)
+        {
+            if (item != null)
+            {
+                string line = item.ToString();
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    await writer.WriteLineAsync(line);  // Use WriteLineAsync for asynchronous file writing
+                }
+            }
+        }
+    }
+
 
     private void OnSystemImageBackup(object sender, EventArgs e)
     {
