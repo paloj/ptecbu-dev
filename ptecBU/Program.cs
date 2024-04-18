@@ -15,7 +15,7 @@ static class Program
 
 
     [STAThread]
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         SystemEvents.SessionSwitch += new SessionSwitchEventHandler(SystemEvents_SessionSwitch);
         Application.ApplicationExit += new EventHandler(Application_ApplicationExit);
@@ -72,7 +72,7 @@ static class Program
         if (args.Contains("-now"))
         {
             // Perform backup with the custom destination if provided
-            BackupManager.PerformBackup(customDestination, FolderSource, ExcludeListSource, true);
+            await BackupManager.PerformBackup(customDestination, FolderSource, ExcludeListSource, true);
         }
         else
         {
@@ -105,13 +105,16 @@ static class Program
             // Handle the MouseUp event for the tray icon
             trayIcon.MouseUp += (sender, e) =>
             {
-                // Check if the right mouse button was clicked
-                if (e.Button == MouseButtons.Right)
+                // Check if the right or left mouse button was clicked
+                if (e.Button == MouseButtons.Right || e.Button == MouseButtons.Left)
                 {
                     // Display the context menu at the location of the mouse click
                     contextMenu.Show(Cursor.Position);
                 }
             };
+
+            // Show a balloon tip for 3 seconds
+            // trayIcon.ShowBalloonTip(3000, "Backup Program", "Backup program running", ToolTipIcon.Info);
 
             // Update the tooltip
             UpdateTrayIconTooltip();
@@ -177,6 +180,7 @@ static class Program
 
     private static void OnBackupNow(object sender, EventArgs e)
     {
+        Debug.WriteLine("Backup now clicked");
         // Check if "-destination" argument is provided
         string customDestination = null;
         if (Environment.GetCommandLineArgs().Length > 2 && Environment.GetCommandLineArgs()[1] == "-destination")
@@ -186,14 +190,14 @@ static class Program
 
         // Start the backup process on a separate thread
         IsBackupInProgress = true;
-        Task.Run(() =>
+        Task.Run(async () =>
         {
-            BackupManager.PerformBackup(customDestination);
-            IsBackupInProgress = false; // Mark backup as complete
-
+            await BackupManager.PerformBackup(customDestination);
+            
             // Update UI from the UI thread
             trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
             {
+                IsBackupInProgress = false; // Mark backup as complete
                 UpdateTrayIconTooltip();
                 UpdateTrayMenuItem(); // Ensure this updates the UI correctly after backup
             }));
@@ -213,7 +217,7 @@ static class Program
         }
     }
 
-    private static void OnCancelBackup(object sender, EventArgs e)
+    private static async void OnCancelBackup(object sender, EventArgs e)
     {
         if (Program.RobocopyProcess != null && !Program.RobocopyProcess.HasExited)
         {
@@ -223,7 +227,7 @@ static class Program
         }
 
         // Reset backup status and update tray menu as necessary
-        StopBlinking();
+        await StopBlinking();
         UpdateTrayMenuItem();
     }
 
@@ -273,19 +277,6 @@ static class Program
                     // assuming that your date is in the first line of the file
                     if (DateTime.TryParse(s, out DateTime lastBackupDateTime))
                     {
-                        string lastBackupText = "";
-
-                        if (Program.destinationReachable)
-                        {
-                            lastBackupText = $"Last backup: {lastBackupDateTime:d.M.yyyy H:mm}";
-                        }
-                        else
-                        {
-                            lastBackupText = $"Backup destination unreachable.\nLast backup: {lastBackupDateTime:d.M.yyyy H:mm}";
-                        }
-
-                        trayIcon.Text = lastBackupText;
-
                         // Check if the last successful backup was more than a month ago
                         if (BackupManager.IsLastBackupOlderThanOneMonth())
                         {
@@ -305,6 +296,19 @@ static class Program
                         // Change the tray icon to red
                         trayIcon.Icon = new Icon("Resources/red.ico");
                     }
+
+                    string lastBackupText = "";
+
+                    if (Program.destinationReachable)
+                    {
+                        lastBackupText = $"Last backup: {lastBackupDateTime:d.M.yyyy H:mm}";
+                    }
+                    else
+                    {
+                        lastBackupText = $"Backup destination unreachable.\nLast backup: {lastBackupDateTime:d.M.yyyy H:mm}";
+                    }
+
+                    trayIcon.Text = lastBackupText;
                     break;
                 }
             }
@@ -330,15 +334,18 @@ static class Program
     }
 
     // Function to stop blinking and reset the icon to green
-    public static void StopBlinking()
+    public static async Task StopBlinking()
     {
         // Stop the blinking
         IsBackupInProgress = false;
-        BackupManager.BlinkTrayIcon(false);
+        await BackupManager.BlinkTrayIconAsync(false);
         // Update tray icon tooltip after backup completion
         UpdateTrayIconTooltip();
-        // Update the tray icon to green
-        trayIcon.Icon = new Icon("Resources/green.ico");
+        // Check if the icon is set to green. If not, set it to green
+        if (trayIcon.Icon != new Icon("Resources/green.ico"))
+        {
+            trayIcon.Icon = new Icon("Resources/green.ico");
+        }
     }
 
     private static void OnSettings(object sender, EventArgs e)
@@ -488,7 +495,7 @@ class CustomApplicationContext : ApplicationContext
 {
     private NotifyIcon trayIcon;
     public static System.Windows.Forms.Timer backupTimer; // Make the timer accessible
-  
+
     public CustomApplicationContext(NotifyIcon trayIcon)
     {
         this.trayIcon = trayIcon;
@@ -576,9 +583,9 @@ class CustomApplicationContext : ApplicationContext
 
                         // Start the backup process on a separate thread
                         Program.IsBackupInProgress = true;
-                        Task.Run(() =>
+                        Task.Run(async () =>
                         {
-                            BackupManager.PerformBackup(tickDestination);
+                            await BackupManager.PerformBackup(tickDestination);
                         });
                         Program.UpdateTrayIconTooltip();
                         Program.UpdateTrayMenuItem();

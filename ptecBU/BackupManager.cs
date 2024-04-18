@@ -37,11 +37,13 @@ public class BackupManager
         Destination = customDestination != null ? Path.Combine(customDestination, hostname) : GetBackupDestination();
     }
 
-    public static void PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
+    public static async Task PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
     {
         // Start blinking tray icon to indicate backup is in progress
         Program.IsBackupInProgress = true;
-        BlinkTrayIcon(true);
+        // Start blinking the tray icon to indicate the backup process has started
+        Debug.WriteLine("Blinking tray icon to indicate backup process has started.");
+        await BlinkTrayIconAsync(true);
 
         // Load global settings
         var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
@@ -53,7 +55,7 @@ public class BackupManager
         if (IsOnlyMakeZipBackupEnabled())
         {
             var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
-            Task.Run(() => archiver.ArchiveFolders(false)); // Run the zip archive process in a separate thread
+            await Task.Run(() => archiver.ArchiveFolders(false)); // Run the zip archive process in a separate thread and await its completion
         }
         else
         {
@@ -83,8 +85,8 @@ public class BackupManager
             // Update tray icon tooltip to "Backup in progress"
             if (!Program.IsRunningWithArguments)
             {
-                // Start blinking tray icon
-                BlinkTrayIcon(true);
+                // Start blinking the tray icon to indicate the backup process has started
+                await BlinkTrayIconAsync(true);
                 Program.trayIcon.Text = "Backup in progress";
             }
 
@@ -246,8 +248,8 @@ public class BackupManager
                     // Check if Program.RobocopyProcess is null after waiting for exit. This can happen if the process was killed or exited unexpectedly or cancelled by the user.
                     if (Program.RobocopyProcess == null)
                     {
-                        // Stop blinking tray icon
-                        BlinkTrayIcon(false);
+                        // Stop blinking the tray icon to indicate the backup process has completed
+                        await BlinkTrayIconAsync(false);
                         Program.IsBackupInProgress = false;
 
                         if (exitAfter)
@@ -325,8 +327,8 @@ public class BackupManager
             if (!IsOnlyMakeZipBackupEnabled())
             {
                 // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
-                var archiver = new FolderArchiver();                // Create a new instance of the FolderArchiver class
-                Task.Run(() => archiver.ArchiveFolders(false));     // Run the archiver in a separate thread
+                var archiver = new FolderArchiver();                    // Create a new instance of the FolderArchiver class
+                await Task.Run(() => archiver.ArchiveFolders(false));   // Run the archiver in a separate thread
             }
         }
 
@@ -436,62 +438,67 @@ public class BackupManager
     private static CancellationTokenSource blinkingCancellationTokenSource;
     private static Task blinkingTask;
 
-    public static async void BlinkTrayIcon(bool start) // Blink the tray icon while backup is in progress
+    public static async Task BlinkTrayIconAsync(bool start)
     {
-        // Define the path to the green and yellow icons
         string greenIconPath = "Resources/green.ico";
         string yellowIconPath = "Resources/yellow.ico";
-
-        // Define the duration of each icon state in milliseconds
         int iconDuration = 500; // 0.5 seconds
 
-        // Get the handle to the green and yellow icons
-        IntPtr greenIconHandle = new Icon(greenIconPath).Handle;
-        IntPtr yellowIconHandle = new Icon(yellowIconPath).Handle;
+        // Load icons only once
+        Debug.WriteLine("Loading icons for blinking.");
+        using Icon greenIcon = new Icon(greenIconPath);
+        using Icon yellowIcon = new Icon(yellowIconPath);
 
         if (start && !isBlinking)
         {
             isBlinking = true;
-
-            // Create a cancellation token source for stopping the blinking animation
             blinkingCancellationTokenSource = new CancellationTokenSource();
 
-            // Start the blinking animation task
+            Debug.WriteLine("Starting blinking task.");
             blinkingTask = Task.Run(async () =>
             {
-                // Alternate between the green and yellow icons while backup is in progress
                 bool isGreenIconVisible = true;
-                while (isBlinking && !blinkingCancellationTokenSource.Token.IsCancellationRequested)
+                try
                 {
-                    // Set the tray icon to the green or yellow icon based on the current state
-                    if (isGreenIconVisible)
+                    while (isBlinking && !blinkingCancellationTokenSource.Token.IsCancellationRequested)
                     {
-                        Program.trayIcon.Icon = Icon.FromHandle(greenIconHandle);
+                        Program.trayIcon.Icon = isGreenIconVisible ? greenIcon : yellowIcon;
+                        await Task.Delay(iconDuration, blinkingCancellationTokenSource.Token);
+                        isGreenIconVisible = !isGreenIconVisible;
                     }
-                    else
-                    {
-                        Program.trayIcon.Icon = Icon.FromHandle(yellowIconHandle);
-                    }
-
-                    Application.DoEvents(); // Allow the icon to be updated
-                    await Task.Delay(iconDuration); // Delay between icon changes
-
-                    // Toggle the icon state
-                    isGreenIconVisible = !isGreenIconVisible;
                 }
-
-                // Set the tray icon to the green icon when backup is completed or stopped
-                Program.trayIcon.Icon = Icon.FromHandle(greenIconHandle);
+                catch (TaskCanceledException)
+                {
+                    // Handle the task being cancelled
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error occurred during blinking: {ex.Message}");
+                    // Log or handle exceptions that might occur during blinking
+                }
+                finally
+                {
+                    // Ensure the original icon is set back once blinking stops
+                    Program.trayIcon.Icon = greenIcon;
+                    isBlinking = false;
+                }
             }, blinkingCancellationTokenSource.Token);
         }
         else if (!start && isBlinking)
         {
             isBlinking = false;
-
-            // Stop the blinking animation
             blinkingCancellationTokenSource?.Cancel();
-            // Wait for the blinking task to complete
-            await blinkingTask;
+            if (blinkingTask != null)
+            {
+                try
+                {
+                    await blinkingTask; // Ensure task is properly awaited and completed
+                }
+                catch (OperationCanceledException)
+                {
+                    // Handle expected cancellation
+                }
+            }
         }
     }
 

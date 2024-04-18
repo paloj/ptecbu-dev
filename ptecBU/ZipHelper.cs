@@ -337,7 +337,7 @@ public class FolderArchiver
         finally
         {
             // Stop blinking tray icon
-            Program.StopBlinking();
+            _ = Program.StopBlinking();
 
             // Stop the timer and log the time taken for archiving
             stopwatch.Stop();
