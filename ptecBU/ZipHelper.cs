@@ -357,7 +357,8 @@ public class FolderArchiver
         finally
         {
             // Stop blinking tray icon
-            _ = Program.StopBlinking();
+            //await BackupManager.BlinkTrayIconAsync(false);
+           // _ = Program.StopBlinking();
 
             // Stop the timer and log the time taken for archiving
             stopwatch.Stop();

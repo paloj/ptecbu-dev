@@ -197,25 +197,32 @@ static class Program
 
         // Start the backup process on a separate thread
         IsBackupInProgress = true;
-        Task.Run(async () =>
+        try
+        {    
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await BackupManager.PerformBackup(customDestination);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                }
+                
+                // Update UI from the UI thread
+                trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
+                {
+                    IsBackupInProgress = false; // Mark backup as complete
+                    UpdateTrayIconTooltip();
+                    UpdateTrayMenuItem(); // Ensure this updates the UI correctly after backup
+                }));
+            });
+        }
+        catch (Exception ex)
         {
-            try
-            {
-                await BackupManager.PerformBackup(customDestination);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-            }
-            
-            // Update UI from the UI thread
-            trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
-            {
-                IsBackupInProgress = false; // Mark backup as complete
-                UpdateTrayIconTooltip();
-                UpdateTrayMenuItem(); // Ensure this updates the UI correctly after backup
-            }));
-        });
+            Debug.WriteLine("Error in backup task run: "+ex.Message);
+        }
 
         // Check backup progress state and update UI accordingly
         // Use 'Invoke' if necessary to ensure thread safety when updating UI elements
@@ -240,15 +247,19 @@ static class Program
             Program.RobocopyProcess = null;
         }
 
+        IsBackupInProgress = false;
+
         // Reset backup status and update tray menu as necessary
         try
         {
-            await StopBlinking();
+            //await StopBlinking();
+            await BackupManager.BlinkTrayIconAsync(false);
         }
         catch (Exception ex)
         {
             Debug.WriteLine(ex.Message);
         }
+        
         UpdateTrayMenuItem();
     }
 
@@ -355,6 +366,7 @@ static class Program
     }
 
     // Function to stop blinking and reset the icon to green
+    /*
     public static async Task StopBlinking()
     {
         // Stop the blinking
@@ -375,7 +387,7 @@ static class Program
             trayIcon.Icon = new Icon("Resources/green.ico");
         }
     }
-
+    */
     private static void OnSettings(object sender, EventArgs e)
     {
         // Handle settings clicked
