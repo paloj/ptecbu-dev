@@ -177,6 +177,16 @@ public class FolderArchiver
 
         try
         {
+            // Overwrite the logfile with an empty string to clear it
+            ClearLogFile();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error clearing log file: {ex.Message}");
+        }
+
+        try
+        {
             // Read the list of folders to archive
             var folders = File.ReadAllLines("folders.txt");
             int totalFolders = folders.Length;  // Total number of folders
@@ -338,6 +348,7 @@ public class FolderArchiver
             if (!files.Any(file => !file.IsExcluded))
             {
                 Debug.WriteLine($"No files to archive in folder {folder}. Skipping ZIP file creation.");
+                AsyncFileLogger.Log($"No files to archive in folder {folder}. Skipping ZIP file creation.");
                 continue; // Skip ZIP creation as there are no files to include
             }
 
@@ -383,7 +394,7 @@ public class FolderArchiver
             folderTimer.Stop();
             Debug.WriteLine($"Folder archiving took {folderTimer.Elapsed.TotalSeconds} seconds.");
             // Log the completion of archiving for the folder
-            AsyncFileLogger.Log("Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.");
+            AsyncFileLogger.Log($"Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.");
         }
     }
 
@@ -459,8 +470,8 @@ public class FolderArchiver
         var latestZipFilePath = GetLatestZipFilePath(folderPath);
         if (string.IsNullOrEmpty(latestZipFilePath))
         {
-            Debug.WriteLine("No existing archive found, creating a new one.");
-            await AsyncFileLogger.LogAsync($"No existing archive found for {folderPath}, creating a new one.\n");
+            Debug.WriteLine($"No existing archive found for {folderPath}.");
+            await AsyncFileLogger.LogAsync($"No existing archive found for {folderPath}.\n");
             return true;
         }
 
@@ -624,7 +635,23 @@ public class FolderArchiver
             statusLabel.Text = message;
         }
     }
+
+    private void ClearLogFile()
+    {
+        try
+        {
+            // Overwrite the logfile with an empty string to clear it
+            File.WriteAllText("log/zip_archive.log", string.Empty);
+        }
+        catch (Exception ex)
+        {
+            // Log the error to a secondary logging mechanism if your main log is unavailable
+            Debug.WriteLine($"Failed to clear log file: {ex.Message}");
+            throw;  // Consider re-throwing to manage upper-level error handling
+        }
+    }
 }
+
 public class AsyncFileLogger
 {
     private static readonly object lockObject = new object();

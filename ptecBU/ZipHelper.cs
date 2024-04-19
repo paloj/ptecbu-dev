@@ -177,16 +177,8 @@ public class FolderArchiver
 
         try
         {
-            // Overwrite the logfile with an empty string to clear it
             ClearLogFile();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error clearing log file: {ex.Message}");
-        }
 
-        try
-        {
             // Read the list of folders to archive
             var folders = File.ReadAllLines("folders.txt");
             int totalFolders = folders.Length;  // Total number of folders
@@ -206,10 +198,28 @@ public class FolderArchiver
             {
                 try
                 {
-                    var folderConfig = LoadFolderSettings(folder, globalConfig); // Load folder settings
                     Debug.WriteLine($"Processing folder: {folder}");
-                    var filteredFiles = await ScanDirectoryAsync(folder, excludedItems); // Scan the directory asynchronously and return a list of files that are not excluded
+                    FolderConfig folderConfig = folderConfigs.ContainsKey(folder) ? folderConfigs[folder] : new FolderConfig { BackupOption = BackupOptions.UseGlobalSetting };
+                    string includeZipInBackup = globalConfig.TryGetValue("includeZipInBackup", out includeZipInBackup) ? includeZipInBackup : "true";
+
+                    if (folderConfig.BackupOption == BackupOptions.UseGlobalSetting && !bool.Parse(includeZipInBackup))
+                    {
+                        Debug.WriteLine("Zipfile creation skipped due to global setting.");
+                        await AsyncFileLogger.LogAsync($"Zipfile creation skipped for {folder} due to global setting.");
+                        return new List<FileInfoItem>(); // Skip processing this folder
+                    }
+
+                    if (IsExcluded(folder, excludedItems))
+                    {
+                        Debug.WriteLine($"Folder excluded: {folder}");
+                        await AsyncFileLogger.LogAsync($"Folder excluded: {folder}");
+                        return new List<FileInfoItem>(); // Skip processing this folder
+                    }
+
+                    var filteredFiles = await ScanDirectoryAsync(folder, excludedItems);
                     Debug.WriteLine($"Files found in folder {folder}: {filteredFiles.Count}");
+                    await AsyncFileLogger.LogAsync($"Files found in folder {folder}: {filteredFiles.Count}");
+
                     return filteredFiles.Select(file => new FileInfoItem
                     {
                         FilePath = file,
@@ -220,21 +230,29 @@ public class FolderArchiver
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error processing folder {folder}: {ex.Message}");
-                    return new List<FileInfoItem>(); // Return an empty list in case of error
+                    await AsyncFileLogger.LogAsync($"Error processing folder {folder}: {ex.Message}");
+                    return new List<FileInfoItem>(); // Handle error by skipping this folder
                 }
             }).ToList();
 
             var results = await Task.WhenAll(tasks);
 
-            // Debug output to verify the lists
-            foreach (var result in results)
+            // Filter out empty lists and corresponding folders
+            List<string> filteredFolders = new List<string>();
+            List<List<FileInfoItem>> filteredResults = new List<List<FileInfoItem>>();
+
+            for (int i = 0; i < results.Length; i++)
             {
-                Debug.WriteLine("Processed Directory:");
-                foreach (var file in result)
+                if (results[i].Count > 0)
                 {
-                    Debug.WriteLine($"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}");
-                    // Log to file asynchronously
-                    await AsyncFileLogger.LogAsync($"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}");
+                    filteredFolders.Add(folders[i]);
+                    filteredResults.Add(results[i]);
+                    Debug.WriteLine($"Processed Directory: {folders[i]} with {results[i].Count} items");
+                    await AsyncFileLogger.LogAsync($"Processed Directory: {folders[i]} with {results[i].Count} items");
+                }
+                else
+                {
+                    Debug.WriteLine($"Skipping empty directory: {folders[i]}");
                 }
             }
 
