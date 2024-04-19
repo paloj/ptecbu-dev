@@ -38,6 +38,15 @@ public class BackupManager
 
     public static async Task PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
     {
+        // Initialize the stopwatch at the start of the backup process
+        Stopwatch backupTimer = new Stopwatch();
+        backupTimer.Start();
+
+        // Ensure the log file is clear or create it if not existing
+        string logFilePath = "log/backupDuration.log";
+        File.WriteAllText(logFilePath, "");  // Clears the existing log or creates a new one
+        TimeSpan robocopyDuration = TimeSpan.Zero;
+
         // Start blinking tray icon to indicate backup is in progress
         Program.IsBackupInProgress = true;
         // Start blinking the tray icon to indicate the backup process has started
@@ -352,7 +361,13 @@ public class BackupManager
                     File.WriteAllText("log/lastFail.log", DateTime.Now.ToString("o"));
                 }
 
+                // Log the robocopy duration
+                robocopyDuration = backupTimer.Elapsed;
+                File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy duration ({folder}): {robocopyDuration}\n");
             }
+
+            robocopyDuration = backupTimer.Elapsed;
+            File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy total duration: {robocopyDuration}\n");
 
             // Add zip to backup if enabled in config.ini and not set to only make zip backups
             if (!IsOnlyMakeZipBackupEnabled())
@@ -380,6 +395,15 @@ public class BackupManager
                         Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
                     }
                     Program.IsBackupInProgress = false;
+
+                    // Write the full backup duration to the log file
+                    TimeSpan zipDuration = backupTimer.Elapsed - robocopyDuration;
+                    File.AppendAllText(logFilePath, $"{DateTime.Now:O} ZIP archiving duration: {zipDuration}\n");
+
+                    // Conclude the backup process
+                    backupTimer.Stop();
+                    TimeSpan totalBackupDuration = backupTimer.Elapsed;
+                    File.AppendAllText(logFilePath, $"{DateTime.Now:O} Full backup duration: {totalBackupDuration}\n");
                 }
             }
         }
@@ -545,6 +569,7 @@ public class BackupManager
                 }
                 finally
                 {
+                    Debug.WriteLine("Ignore above exception. (Exception thrown: 'System.Threading.Tasks.TaskCanceledException' in System.Private.CoreLib.dll) It is normal.");
                     if (BlinkCancellationTokenSource != null)
                     {
                         BlinkCancellationTokenSource.Dispose();

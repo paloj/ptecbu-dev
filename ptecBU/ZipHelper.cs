@@ -181,7 +181,7 @@ public class FolderArchiver
             var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
             // Initialize empty log file and keep it open for writing
-            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}/n/n");
+            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}\n");
 
             // Start async archiving process for each folder. First asynchronously create a list of files for each folder that are not excluded using FileInfoItem class
             var tasks = folders.Select(async folder =>
@@ -252,11 +252,13 @@ public class FolderArchiver
                 Debug.WriteLine($"Archive check result for {folders[i]}: {archiveResults[i]}");
             }
 
+            File.AppendAllText("log/zip_archive.log", $"Filelists created in {stopwatch.Elapsed.TotalSeconds} seconds.\n");
+
             // Now start synchronous archiving of the folders that need a new archive based on the results
             WriteArchivesSync([.. folders], [.. results], archiveResults, globalConfig, destinationPath, prompt);
 
             // Log the completion of archiving
-            File.AppendAllText("log/zip_archive.log", $"Archiving completed at {DateTime.Now}/n/n");
+            File.AppendAllText("log/zip_archive.log", $"Archiving completed at {DateTime.Now} in {stopwatch.Elapsed.TotalSeconds} seconds.\n\n");
 
             // Update the UI status label if prompt is true
             if (prompt)
@@ -287,6 +289,10 @@ public class FolderArchiver
         int totalFolders = folders.Count;
         for (int i = 0; i < totalFolders; i++)
         {
+            // Timer to measure the time taken for each folder
+            Stopwatch folderTimer = new Stopwatch();
+            folderTimer.Start();
+
             // Load folder settings. If no individual settings are found, use global settings
             FolderConfig folderConfig = LoadFolderSettings(folders[i], globalConfig);
 
@@ -351,6 +357,10 @@ public class FolderArchiver
             }
 
             Debug.WriteLine($"Completed archiving: {folder}");
+            folderTimer.Stop();
+            Debug.WriteLine($"Folder archiving took {folderTimer.Elapsed.TotalSeconds} seconds.");
+            // Log the completion of archiving for the folder
+            File.AppendAllText("log/zip_archive.log", $"Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.\n");
         }
     }
 
