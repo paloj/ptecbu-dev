@@ -161,6 +161,13 @@ public class FolderArchiver
         };
     }
 
+    public class ArchiveStatus
+    {
+        public bool NeedsArchive { get; set; }
+        public string Message { get; set; }
+    }
+
+
     public async Task ArchiveFolders(bool prompt = true)
     {
         // Start timer to measure the time taken for archiving
@@ -215,6 +222,8 @@ public class FolderArchiver
                 foreach (var file in result)
                 {
                     Debug.WriteLine($"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}");
+                    // Log to file
+                    File.AppendAllText("log/zip_archive.log", $"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}\n");
                 }
             }
 
@@ -229,14 +238,26 @@ public class FolderArchiver
                     var folderConfig = LoadFolderSettings(folder, globalConfig); // Load folder settings
                     var files = results[index]; // Get the list of files for the folder
                     Debug.WriteLine($"Starting to check archive necessity for folder: {folder} with {files.Count} files.");
+
                     bool needsArchive = await ShouldCreateNewArchiveAsync(folder, files, folderConfig, globalConfig);
-                    Debug.WriteLine($"Archive check complete for {folder}: " + (needsArchive ? "New archive needed." : "No new archive needed."));
-                    return needsArchive;
+                    string statusMessage = $"Archive check complete for {folder}: " + (needsArchive ? "New archive needed." : "No new archive needed.");
+
+                    Debug.WriteLine(statusMessage);
+
+                    return new ArchiveStatus
+                    {
+                        NeedsArchive = needsArchive,
+                        Message = statusMessage
+                    };
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error checking archive for folder {folder}: {ex.Message}");
-                    return false; // Return false in case of error
+                    return new ArchiveStatus
+                    {
+                        NeedsArchive = false,
+                        Message = $"Error checking archive for folder {folder}: {ex.Message}"
+                    };
                 }
                 finally
                 {
@@ -246,16 +267,17 @@ public class FolderArchiver
 
             var archiveResults = await Task.WhenAll(archiveTasks);
 
-            // Debug output to verify the results
-            for (int i = 0; i < archiveResults.Length; i++)
+            // Log output to verify the results and write them to a file
+            foreach (var result in archiveResults)
             {
-                Debug.WriteLine($"Archive check result for {folders[i]}: {archiveResults[i]}");
+                Debug.WriteLine(result.Message);
+                File.AppendAllText("log/zip_archive.log", result.Message + "\n");
             }
 
             File.AppendAllText("log/zip_archive.log", $"Filelists created in {stopwatch.Elapsed.TotalSeconds} seconds.\n");
 
             // Now start synchronous archiving of the folders that need a new archive based on the results
-            WriteArchivesSync([.. folders], [.. results], archiveResults, globalConfig, destinationPath, prompt);
+            WriteArchivesSync([.. folders], [.. results], [.. archiveResults], globalConfig, destinationPath, prompt);
 
             // Log the completion of archiving
             File.AppendAllText("log/zip_archive.log", $"Archiving completed at {DateTime.Now} in {stopwatch.Elapsed.TotalSeconds} seconds.\n\n");
@@ -284,7 +306,7 @@ public class FolderArchiver
     }
 
     // Function to archive folders synchronously
-    public void WriteArchivesSync(List<string> folders, List<List<FileInfoItem>> fileLists, bool[] needsArchive, Dictionary<string, string> globalConfig, string destinationPath, bool prompt = true)
+    public void WriteArchivesSync(List<string> folders, List<List<FileInfoItem>> fileLists, List<ArchiveStatus> archiveStatuses, Dictionary<string, string> globalConfig, string destinationPath, bool prompt = true)
     {
         int totalFolders = folders.Count;
         for (int i = 0; i < totalFolders; i++)
@@ -296,7 +318,7 @@ public class FolderArchiver
             // Load folder settings. If no individual settings are found, use global settings
             FolderConfig folderConfig = LoadFolderSettings(folders[i], globalConfig);
 
-            if (!needsArchive[i]) continue;  // Skip folders that do not need a new archive
+            if (!archiveStatuses[i].NeedsArchive) continue;  // Use the updated data structure
 
             // Update UI if prompt is true
             if (prompt)
@@ -364,26 +386,33 @@ public class FolderArchiver
         }
     }
 
-    private void CreateZipArchive(string folder, string zipFilePath, List<FileInfoItem> files)
+    public void CreateZipArchive(string folder, string zipFilePath, List<FileInfoItem> files)
     {
-        using (var zip = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
+        Debug.WriteLine($"Creating ZIP archive at: {zipFilePath}");
+        try
         {
-            string folderName = new DirectoryInfo(folder).Name;  // Gets the name of the folder to be archived
-
-            foreach (var file in files)
+            using (var zip = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
             {
-                if (!file.IsExcluded && File.Exists(file.FilePath))
+                foreach (var file in files)
                 {
-                    // Calculate the relative path from the folder to the file, including the folder name
-                    string relativePath = Path.GetRelativePath(folder, file.FilePath);
-                    string entryName = Path.Combine(folderName, relativePath);  // Prepend the folder name
-
-                    // Create the entry in the zip file preserving the full folder structure
-                    zip.CreateEntryFromFile(file.FilePath, entryName, CompressionLevel.Optimal);
+                    if (!file.IsExcluded)
+                    {
+                        // Ensure the relative path is calculated correctly
+                        string relativePath = Path.GetRelativePath(folder, file.FilePath);
+                        string entryName = Path.Combine(Path.GetFileName(folder), relativePath);
+                        Debug.WriteLine($"Adding file: {entryName} to ZIP");
+                        zip.CreateEntryFromFile(file.FilePath, entryName, CompressionLevel.Optimal);
+                    }
                 }
             }
         }
+        catch (Exception ex)
+        {
+            LogError($"Error creating ZIP archive at {zipFilePath}: {ex.Message}");
+            throw;
+        }
     }
+
 
     private bool IsFolderBigUI(string folder)
     {

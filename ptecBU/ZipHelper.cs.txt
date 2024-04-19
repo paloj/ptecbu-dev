@@ -88,7 +88,7 @@ public class FolderArchiver
             }
 
             regexPattern = "^" + regexPattern + "$"; // Match the whole path
-            Debug.WriteLine($"Matching against pattern: {pattern} => Regex: {regexPattern} for path: {normalizedPath}");
+            //Debug.WriteLine($"Matching against pattern: {pattern} => Regex: {regexPattern} for path: {normalizedPath}");
 
             if (Regex.IsMatch(normalizedPath, regexPattern, RegexOptions.IgnoreCase))
             {
@@ -161,6 +161,13 @@ public class FolderArchiver
         };
     }
 
+    public class ArchiveStatus
+    {
+        public bool NeedsArchive { get; set; }
+        public string Message { get; set; }
+    }
+
+
     public async Task ArchiveFolders(bool prompt = true)
     {
         // Start timer to measure the time taken for archiving
@@ -181,7 +188,7 @@ public class FolderArchiver
             var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
             // Initialize empty log file and keep it open for writing
-            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}/n/n");
+            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}\n");
 
             // Start async archiving process for each folder. First asynchronously create a list of files for each folder that are not excluded using FileInfoItem class
             var tasks = folders.Select(async folder =>
@@ -190,9 +197,9 @@ public class FolderArchiver
                 {
                     var folderConfig = LoadFolderSettings(folder, globalConfig); // Load folder settings
                     Debug.WriteLine($"Processing folder: {folder}");
-                    var files = await ScanDirectoryAsync(folder, excludedItems); // Scan the directory asynchronously and return a list of files that are not excluded
-                    Debug.WriteLine($"Files found in folder {folder}: {files.Count}");
-                    return files.Select(file => new FileInfoItem
+                    var filteredFiles = await ScanDirectoryAsync(folder, excludedItems); // Scan the directory asynchronously and return a list of files that are not excluded
+                    Debug.WriteLine($"Files found in folder {folder}: {filteredFiles.Count}");
+                    return filteredFiles.Select(file => new FileInfoItem
                     {
                         FilePath = file,
                         LastModified = File.GetLastWriteTime(file),
@@ -215,10 +222,12 @@ public class FolderArchiver
                 foreach (var file in result)
                 {
                     Debug.WriteLine($"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}");
+                    // Log to file
+                    File.AppendAllText("log/zip_archive.log", $"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}\n");
                 }
             }
 
-            // Now use ShouldCreateNewArchiveAsync to determine if a new archive should be created for each folder
+            // Now use ShouldCreateNewArchive Async to determine if a new archive should be created for each folder
             var semaphore = new SemaphoreSlim(5); // Limit to 5 concurrent tasks if needed
 
             var archiveTasks = folders.Select(async (folder, index) =>
@@ -229,14 +238,26 @@ public class FolderArchiver
                     var folderConfig = LoadFolderSettings(folder, globalConfig); // Load folder settings
                     var files = results[index]; // Get the list of files for the folder
                     Debug.WriteLine($"Starting to check archive necessity for folder: {folder} with {files.Count} files.");
-                    bool needsArchive = await ShouldCreateNewArchiveAsync(folder, folderConfig, globalConfig, excludedItems);
-                    Debug.WriteLine($"Archive check complete for {folder}: " + (needsArchive ? "New archive needed." : "No new archive needed."));
-                    return needsArchive;
+
+                    bool needsArchive = await ShouldCreateNewArchiveAsync(folder, files, folderConfig, globalConfig);
+                    string statusMessage = $"Archive check complete for {folder}: " + (needsArchive ? "New archive needed." : "No new archive needed.");
+
+                    Debug.WriteLine(statusMessage);
+
+                    return new ArchiveStatus
+                    {
+                        NeedsArchive = needsArchive,
+                        Message = statusMessage
+                    };
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error checking archive for folder {folder}: {ex.Message}");
-                    return false; // Return false in case of error
+                    return new ArchiveStatus
+                    {
+                        NeedsArchive = false,
+                        Message = $"Error checking archive for folder {folder}: {ex.Message}"
+                    };
                 }
                 finally
                 {
@@ -246,17 +267,20 @@ public class FolderArchiver
 
             var archiveResults = await Task.WhenAll(archiveTasks);
 
-            // Debug output to verify the results
-            for (int i = 0; i < archiveResults.Length; i++)
+            // Log output to verify the results and write them to a file
+            foreach (var result in archiveResults)
             {
-                Debug.WriteLine($"Archive check result for {folders[i]}: {archiveResults[i]}");
+                Debug.WriteLine(result.Message);
+                File.AppendAllText("log/zip_archive.log", result.Message + "\n");
             }
 
+            File.AppendAllText("log/zip_archive.log", $"Filelists created in {stopwatch.Elapsed.TotalSeconds} seconds.\n");
+
             // Now start synchronous archiving of the folders that need a new archive based on the results
-            WriteArchivesSync([.. folders], [.. results], archiveResults, globalConfig, destinationPath, prompt);
+            WriteArchivesSync([.. folders], [.. results], [.. archiveResults], globalConfig, destinationPath, prompt);
 
             // Log the completion of archiving
-            File.AppendAllText("log/zip_archive.log", $"Archiving completed at {DateTime.Now}/n/n");
+            File.AppendAllText("log/zip_archive.log", $"Archiving completed at {DateTime.Now} in {stopwatch.Elapsed.TotalSeconds} seconds.\n\n");
 
             // Update the UI status label if prompt is true
             if (prompt)
@@ -282,15 +306,19 @@ public class FolderArchiver
     }
 
     // Function to archive folders synchronously
-    public void WriteArchivesSync(List<string> folders, List<List<FileInfoItem>> fileLists, bool[] needsArchive, Dictionary<string, string> globalConfig, string destinationPath, bool prompt = true)
+    public void WriteArchivesSync(List<string> folders, List<List<FileInfoItem>> fileLists, List<ArchiveStatus> archiveStatuses, Dictionary<string, string> globalConfig, string destinationPath, bool prompt = true)
     {
         int totalFolders = folders.Count;
         for (int i = 0; i < totalFolders; i++)
         {
+            // Timer to measure the time taken for each folder
+            Stopwatch folderTimer = new Stopwatch();
+            folderTimer.Start();
+
             // Load folder settings. If no individual settings are found, use global settings
             FolderConfig folderConfig = LoadFolderSettings(folders[i], globalConfig);
 
-            if (!needsArchive[i]) continue;  // Skip folders that do not need a new archive
+            if (!archiveStatuses[i].NeedsArchive) continue;  // Use the updated data structure
 
             // Update UI if prompt is true
             if (prompt)
@@ -305,6 +333,12 @@ public class FolderArchiver
 
             var folder = folders[i];
             var files = fileLists[i]; // List of FileInfoItem
+
+            if (!files.Any(file => !file.IsExcluded))
+            {
+                Debug.WriteLine($"No files to archive in folder {folder}. Skipping ZIP file creation.");
+                continue; // Skip ZIP creation as there are no files to include
+            }
 
             Debug.WriteLine($"Archiving {folder}");
 
@@ -345,6 +379,10 @@ public class FolderArchiver
             }
 
             Debug.WriteLine($"Completed archiving: {folder}");
+            folderTimer.Stop();
+            Debug.WriteLine($"Folder archiving took {folderTimer.Elapsed.TotalSeconds} seconds.");
+            // Log the completion of archiving for the folder
+            File.AppendAllText("log/zip_archive.log", $"Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.\n");
         }
     }
 
@@ -389,7 +427,7 @@ public class FolderArchiver
         return false;
     }
 
-    public async Task<bool> ShouldCreateNewArchiveAsync(string folderPath, FolderConfig folderConfig, Dictionary<string, string> globalConfig, List<string> excludedItems)
+    public async Task<bool> ShouldCreateNewArchiveAsync(string folderPath, List<FileInfoItem> files, FolderConfig folderConfig, Dictionary<string, string> globalConfig)
     {
         // Skip archive creation based on global settings
         if (folderConfig?.BackupOption == BackupOptions.UseGlobalSetting &&
@@ -428,14 +466,11 @@ public class FolderArchiver
                     entry => entry.FullName.Replace('\\', '/'),  // Normalize file paths
                     entry => entry.LastWriteTime.DateTime);
 
-                // Enumerate all files in the directory (assuming these files have already been filtered for exclusions)
-                var files = Directory.EnumerateFiles(folderPath, "*", SearchOption.AllDirectories);
                 TimeSpan tolerance = TimeSpan.FromSeconds(30);  // Define a tolerance of 30 seconds
 
-                foreach (string filePath in files)
+                foreach (var fileInfo in files)
                 {
-                    string relativePath = GetRelativePath(filePath, folderPath).Replace('\\', '/').TrimStart('/');
-                    FileInfo localFile = new FileInfo(filePath);
+                    string relativePath = GetRelativePath(fileInfo.FilePath, folderPath).Replace('\\', '/').TrimStart('/');
 
                     // Check if the file exists in the archive and compare times if it does
                     if (!zipEntries.ContainsKey(relativePath))
@@ -445,7 +480,7 @@ public class FolderArchiver
                     }
 
                     DateTime archiveTime = zipEntries[relativePath];
-                    DateTime localTime = localFile.LastWriteTime;
+                    DateTime localTime = fileInfo.LastModified;
                     Debug.WriteLine($"Comparing: {relativePath}");
                     Debug.WriteLine($"Archive time: {archiveTime}, Local time: {localTime}");
 

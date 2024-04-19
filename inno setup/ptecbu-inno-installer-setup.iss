@@ -36,18 +36,18 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.deps.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.pdb"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\ptecBU.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\config.ini"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\excludedItems.txt"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\system_backup.bat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\OHJE.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Resources\*"; DestDir: "{app}\Resources\"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\Launcher\*"; DestDir: "{app}\Launcher\"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\ptecBU\bin\Release\net7.0-windows\win10-x64\publish\updater\*"; DestDir: "{app}\updater\"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\ptecBU.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\ptecBU.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\ptecBU.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\ptecBU.pdb"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\ptecBU.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\config.ini"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\excludedItems.txt"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\system_backup.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\OHJE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\Resources\*"; DestDir: "{app}\Resources\"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\Launcher\*"; DestDir: "{app}\Launcher\"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\ptecBU\bin\Release\net8.0-windows\win-x64\publish\updater\*"; DestDir: "{app}\updater\"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
