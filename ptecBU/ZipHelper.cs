@@ -394,7 +394,7 @@ public class FolderArchiver
             folderTimer.Stop();
             Debug.WriteLine($"Folder archiving took {folderTimer.Elapsed.TotalSeconds} seconds.");
             // Log the completion of archiving for the folder
-            AsyncFileLogger.Log("Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.");
+            AsyncFileLogger.Log($"Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.");
         }
     }
 
