@@ -252,9 +252,13 @@ public class FolderArchiver
                 }
                 else
                 {
-                    Debug.WriteLine($"Skipping empty directory: {folders[i]}");
+                    Debug.WriteLine($"Filtering empty directory: {folders[i]}");
+                    await AsyncFileLogger.LogAsync($"Filtering empty directory: {folders[i]}");
                 }
             }
+            // Update the folders and results to only include non-empty directories
+            folders = filteredFolders.ToArray();
+            results = filteredResults.Select(r => r.ToList()).ToArray();
 
             // Now use ShouldCreateNewArchive Async to determine if a new archive should be created for each folder
             var semaphore = new SemaphoreSlim(5); // Limit to 5 concurrent tasks if needed
