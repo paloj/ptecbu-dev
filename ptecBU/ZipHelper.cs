@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.VisualBasic.Logging;
 
 public class FileInfoItem
 {
@@ -16,7 +17,6 @@ public class FolderArchiver
     private Label statusLabel;
     private string destinationPath;
     private const string ExcludedItemsPath = "excludedItems.txt";
-    private const string LogFilePath = "log/archive_err.log";
 
     public FolderArchiver(Label statusLabel = null)
     {
@@ -58,7 +58,7 @@ public class FolderArchiver
         }
         catch (Exception ex)
         {
-            LogError($"Error scanning directory: {ex.Message}");
+            await AsyncFileLogger.LogAsync($"Error scanning directory: {ex.Message}");
             if (statusLabel != null)
             {
                 UpdateStatusLabel($"Error scanning directory: {ex.Message}");
@@ -123,7 +123,8 @@ public class FolderArchiver
         }
         catch (Exception ex)
         {
-            LogError($"Error reading config file: {ex.Message}");
+            AsyncFileLogger.Log($"Error reading config file: {ex.Message}");
+
             if (statusLabel != null)
             {
                 UpdateStatusLabel($"Error reading config file: {ex.Message}");
@@ -176,6 +177,16 @@ public class FolderArchiver
 
         try
         {
+            // Overwrite the logfile with an empty string to clear it
+            ClearLogFile();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error clearing log file: {ex.Message}");
+        }
+
+        try
+        {
             // Read the list of folders to archive
             var folders = File.ReadAllLines("folders.txt");
             int totalFolders = folders.Length;  // Total number of folders
@@ -187,8 +198,8 @@ public class FolderArchiver
             var folderConfigs = FolderConfigManager.LoadFolderConfigs();
             var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
 
-            // Initialize empty log file and keep it open for writing
-            File.WriteAllText("log/zip_archive.log", $"Archiving started at {DateTime.Now}\n");
+            // Log the start of archiving
+            await AsyncFileLogger.LogAsync("Archiving started.");
 
             // Start async archiving process for each folder. First asynchronously create a list of files for each folder that are not excluded using FileInfoItem class
             var tasks = folders.Select(async folder =>
@@ -222,8 +233,8 @@ public class FolderArchiver
                 foreach (var file in result)
                 {
                     Debug.WriteLine($"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}");
-                    // Log to file
-                    File.AppendAllText("log/zip_archive.log", $"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}\n");
+                    // Log to file asynchronously
+                    await AsyncFileLogger.LogAsync($"File: {file.FilePath}, Last Modified: {file.LastModified}, Excluded: {file.IsExcluded}");
                 }
             }
 
@@ -271,16 +282,16 @@ public class FolderArchiver
             foreach (var result in archiveResults)
             {
                 Debug.WriteLine(result.Message);
-                File.AppendAllText("log/zip_archive.log", result.Message + "\n");
+                await AsyncFileLogger.LogAsync(result.Message);
             }
 
-            File.AppendAllText("log/zip_archive.log", $"Filelists created in {stopwatch.Elapsed.TotalSeconds} seconds.\n");
+            await AsyncFileLogger.LogAsync($"Filelists created in {stopwatch.Elapsed.TotalSeconds} seconds.");
 
             // Now start synchronous archiving of the folders that need a new archive based on the results
             WriteArchivesSync([.. folders], [.. results], [.. archiveResults], globalConfig, destinationPath, prompt);
 
             // Log the completion of archiving
-            File.AppendAllText("log/zip_archive.log", $"Archiving completed at {DateTime.Now} in {stopwatch.Elapsed.TotalSeconds} seconds.\n\n");
+            await AsyncFileLogger.LogAsync($"Archiving completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
 
             // Update the UI status label if prompt is true
             if (prompt)
@@ -290,7 +301,7 @@ public class FolderArchiver
         }
         catch (Exception ex)
         {
-            LogError($"Error during archiving: {ex.Message}");
+            AsyncFileLogger.Log($"Error during archiving: {ex.Message}");
             if (prompt)
             { // Only display the status if the prompt is shown (not when the process is run in the background}
                 MessageBox.Show($"Error during archiving: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -337,6 +348,7 @@ public class FolderArchiver
             if (!files.Any(file => !file.IsExcluded))
             {
                 Debug.WriteLine($"No files to archive in folder {folder}. Skipping ZIP file creation.");
+                AsyncFileLogger.Log($"No files to archive in folder {folder}. Skipping ZIP file creation.");
                 continue; // Skip ZIP creation as there are no files to include
             }
 
@@ -382,7 +394,7 @@ public class FolderArchiver
             folderTimer.Stop();
             Debug.WriteLine($"Folder archiving took {folderTimer.Elapsed.TotalSeconds} seconds.");
             // Log the completion of archiving for the folder
-            File.AppendAllText("log/zip_archive.log", $"Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.\n");
+            AsyncFileLogger.Log("Archiving completed for {folder} in {folderTimer.Elapsed.TotalSeconds} seconds.");
         }
     }
 
@@ -408,7 +420,7 @@ public class FolderArchiver
         }
         catch (Exception ex)
         {
-            LogError($"Error creating ZIP archive at {zipFilePath}: {ex.Message}");
+            AsyncFileLogger.Log($"Error creating ZIP archive at {zipFilePath}: {ex.Message}");
             throw;
         }
     }
@@ -442,7 +454,7 @@ public class FolderArchiver
             !bool.Parse(includeZipInBackup))
         {
             Debug.WriteLine("Zipfile creation skipped due to global setting.");
-            await LogAsync($"Zipfile creation skipped for {folderPath} due to global setting.\n");
+            await AsyncFileLogger.LogAsync($"Zipfile creation skipped for {folderPath} due to global setting.");
             return false;
         }
 
@@ -450,7 +462,7 @@ public class FolderArchiver
         if (IsZipfileComparisonSkipped(folderConfig, globalConfig))
         {
             Debug.WriteLine("Zipfile comparison skipped due to configuration.");
-            await LogAsync($"Zipfile comparison skipped for {folderPath} due to configuration.\n");
+            await AsyncFileLogger.LogAsync($"Zipfile comparison skipped for {folderPath} due to configuration.\n");
             return true;
         }
 
@@ -458,8 +470,8 @@ public class FolderArchiver
         var latestZipFilePath = GetLatestZipFilePath(folderPath);
         if (string.IsNullOrEmpty(latestZipFilePath))
         {
-            Debug.WriteLine("No existing archive found, creating a new one.");
-            await LogAsync($"No existing archive found for {folderPath}, creating a new one.\n");
+            Debug.WriteLine($"No existing archive found for {folderPath}.");
+            await AsyncFileLogger.LogAsync($"No existing archive found for {folderPath}.\n");
             return true;
         }
 
@@ -502,15 +514,6 @@ public class FolderArchiver
             }
         });
     }
-
-    private async Task LogAsync(string message)
-    {
-        await Task.Run(() =>
-        {
-            File.AppendAllText("log/zip_archive.log", message);
-        });
-    }
-
 
     private string GetLatestZipFilePath(string folderPath)
     {
@@ -563,11 +566,11 @@ public class FolderArchiver
             {
                 File.Delete(file);
                 Debug.WriteLine($"Deleted old zip file: {file}");
-                File.AppendAllText("log/zip_archive.log", $"Deleted old zip file: {file}\n");
+                AsyncFileLogger.LogAsync($"Deleted old zip file: {file}").Wait();
             }
             catch (Exception ex)
             {
-                LogError($"Error deleting old zip file: {file}. {ex.Message}");
+                AsyncFileLogger.Log($"Error deleting old zip file: {file}. {ex.Message}");
             }
         }
     }
@@ -633,94 +636,98 @@ public class FolderArchiver
         }
     }
 
-    public static void LogError(string message)
+    private void ClearLogFile()
     {
         try
         {
-            File.AppendAllText(LogFilePath, $"{DateTime.Now}: {message}\n");
+            // Overwrite the logfile with an empty string to clear it
+            File.WriteAllText("log/zip_archive.log", string.Empty);
         }
-        catch
+        catch (Exception ex)
         {
-            // Optionally handle logging errors, but be careful to avoid recursive error logging.
+            // Log the error to a secondary logging mechanism if your main log is unavailable
+            Debug.WriteLine($"Failed to clear log file: {ex.Message}");
+            throw;  // Consider re-throwing to manage upper-level error handling
         }
     }
 }
 
-
-public static class ZipHelper
+public class AsyncFileLogger
 {
-    public static void CreateFromDirectory(
-    string sourceDirectoryName,
-    string destinationArchiveFileName,
-    CompressionLevel compressionLevel,
-    bool includeBaseDirectory,
-    Encoding entryNameEncoding,
-    Predicate<string> filter)
+    private static readonly object lockObject = new object();
+    private static readonly Queue<string> logQueue = new Queue<string>();
+    private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+    private static bool isProcessing = false;
+    private static string LogFilePath = "log/zip_archive.log";
+
+    public static async Task LogAsync(string message)
     {
-        if (string.IsNullOrEmpty(sourceDirectoryName))
-            throw new ArgumentNullException(nameof(sourceDirectoryName));
-        if (string.IsNullOrEmpty(destinationArchiveFileName))
-            throw new ArgumentNullException(nameof(destinationArchiveFileName));
+        EnqueueMessage($"{DateTime.Now}: {message}");
+        await ProcessQueue();
+    }
 
-        var filesToAdd = new List<string>();
-        AddFilesRecursively(sourceDirectoryName, filesToAdd, filter);
+    public static void Log(string message)
+    {
+        EnqueueMessage($"{DateTime.Now}: {message}");
+        Task.Run(() => ProcessQueue()).Wait();
+    }
 
-        var entryNames = GetEntryNames(filesToAdd.ToArray(), sourceDirectoryName, includeBaseDirectory);
+    public static void LogError(string message)
+    {
+        EnqueueMessage($"ERROR {DateTime.Now}: {message}");
+        Task.Run(() => ProcessQueue()).Wait();
+    }
 
-        using (var zipFileStream = new FileStream(destinationArchiveFileName, FileMode.Create))
-        using (var archive = new ZipArchive(zipFileStream, ZipArchiveMode.Create))
+    private static void EnqueueMessage(string message)
+    {
+        lock (lockObject)
         {
-            for (int i = 0; i < filesToAdd.Count; i++)
-            {
-                Debug.WriteLine($"Evaluating file {filesToAdd[i]} for inclusion in archive.");
-                // File inclusion check is now unnecessary here because we've already filtered in AddFilesRecursively
-                archive.CreateEntryFromFile(filesToAdd[i], entryNames[i], compressionLevel);
-                Debug.WriteLine($"Adding file to archive: {filesToAdd[i]}");
-            }
+            logQueue.Enqueue(message);
         }
     }
 
-    private static void AddFilesRecursively(string currentDir, List<string> filesToAdd, Predicate<string> filter)
+    private static async Task ProcessQueue()
     {
-        // Check if the current directory itself should be excluded
-        if (!filter(currentDir))
+        if (!isProcessing)
         {
-            Debug.WriteLine($"Excluding directory and its contents: {currentDir}");
-            return; // Skip this directory and all its contents
-        }
-
-        foreach (var file in Directory.GetFiles(currentDir))
-        {
-            if (filter(file))
+            lock (lockObject)
             {
-                filesToAdd.Add(file);
-                Debug.WriteLine($"Included file: {file}");
+                if (!isProcessing)  // Double-check locking
+                {
+                    isProcessing = true;
+                }
+                else
+                {
+                    return;
+                }
             }
-            else
+
+            try
             {
-                Debug.WriteLine($"Excluded file: {file}");
+                await semaphore.WaitAsync();
+                while (logQueue.Count > 0)
+                {
+                    string msg;
+                    lock (lockObject)
+                    {
+                        msg = logQueue.Dequeue();
+                    }
+                    try
+                    {
+                        await File.AppendAllTextAsync(LogFilePath, msg + Environment.NewLine);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Handle file access errors (possibly log to a different location or notify admin)
+                        System.Diagnostics.Debug.WriteLine("Failed to write to log file: " + ex.Message);
+                    }
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+                isProcessing = false;
             }
         }
-
-        foreach (var directory in Directory.GetDirectories(currentDir))
-        {
-            Debug.WriteLine($"Processing subdirectory: {directory}");
-            AddFilesRecursively(directory, filesToAdd, filter);
-        }
-    }
-
-
-    private static string[] GetEntryNames(string[] filesToAdd, string sourceDirectoryName, bool includeBaseDirectory)
-    {
-        var entryNames = new string[filesToAdd.Length];
-        for (int i = 0; i < filesToAdd.Length; i++)
-        {
-            var path = filesToAdd[i].Substring(sourceDirectoryName.Length).TrimStart(Path.DirectorySeparatorChar);
-            if (includeBaseDirectory)
-                path = Path.Combine(Path.GetFileName(sourceDirectoryName), path);
-
-            entryNames[i] = path;
-        }
-        return entryNames;
     }
 }
