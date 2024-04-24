@@ -25,9 +25,12 @@ class SettingsForm : Form
     private NumericUpDown globalMaxZipRetentionUpDown;
     public Label ArchiveStatusLabel;
     private LinkLabel openConfigFileLinkLabel;
-    private Button systemImageBackupButton;
+    private Button RunBackupButton;
     private Button ArchiveFoldersButton;
+    private Button systemImageBackupButton;
     private Button CheckUpdatesButton;
+    private StatusStrip statusStrip;
+    private ToolStripStatusLabel statusLabel;
     private ToolTip fullPathToolTip = new()
     {
         AutoPopDelay = 5000,
@@ -64,7 +67,7 @@ class SettingsForm : Form
 
         // Set up the form
         Text = $"PtecBU Settings - App version: {version}";
-        Size = new Size(670, 500);
+        Size = new Size(670, 540);
         FormBorderStyle = FormBorderStyle.FixedSingle; // Make the form non-resizable
 
         // Set the form's icon
@@ -245,14 +248,29 @@ class SettingsForm : Form
             SaveFolderSettings(foldersListBox.SelectedItem.ToString());
         };
 
-
-        ArchiveFoldersButton = new Button()
+        // Create the Run Backup button
+        RunBackupButton = new Button()
         {
-            Location = new Point(10, 340), // Adjust these values to place the button appropriately
+            Location = new Point(10, 370), // Adjust these values to place the button appropriately
             AutoSize = true, // Enable auto-sizing to adjust the button's width based on its text content
             AutoSizeMode = AutoSizeMode.GrowAndShrink, // Allow the button to grow and shrink
             Height = 25, // Specify the desired height
-            Text = "Zip all folders to backup location now",
+            Text = "Run Backup",
+        };
+        RunBackupButton.Click += (s, e) =>
+        {
+            // Run the backup process asynchronously
+            Task.Run(() => Program.OnBackupNow(s, e));
+        };
+        Controls.Add(RunBackupButton);
+
+        ArchiveFoldersButton = new Button()
+        {
+            Location = new Point(10, 400), // Adjust these values to place the button appropriately
+            AutoSize = true, // Enable auto-sizing to adjust the button's width based on its text content
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, // Allow the button to grow and shrink
+            Height = 25, // Specify the desired height
+            Text = "Create Zip Backups Now",
         };
         LabelToolTip.SetToolTip(ArchiveFoldersButton, "Backup all folders to zip files in the backup location. This may take a long time depending on the folder size.");
 
@@ -264,33 +282,21 @@ class SettingsForm : Form
         {
             Location = new Point(235, 345), // Adjust these values to place the label appropriately
             AutoSize = true,
-            Text = ""   // Empty placeholder for archiving status
+            Text = "sample text for placing the element"   // Empty placeholder for archiving status
         };
         Controls.Add(ArchiveStatusLabel);
 
         // Create the label for the last successful backup
         lastBackupLabel = new Label()
         {
-            Location = new Point(10, 370), // Adjust these values to place the label appropriately
+            Location = new Point(10, 330), // Adjust these values to place the label appropriately
             AutoSize = true
         };
         Controls.Add(lastBackupLabel);
 
-        //Get and display backup destination
-        backupDestinationLabel = new Label()
-        {
-            Location = new Point(10, 390), // Adjust these values to place the label appropriately
-            Text = "Backup destination: " + BackupManager.GetBackupDestination(),
-            AutoSize = true
-        };
-        // Subscribe to the Click event to open the destination when clicked
-        backupDestinationLabel.Click += BackupDestinationLabel_Click;
-        Controls.Add(backupDestinationLabel);
-        LabelToolTip.SetToolTip(backupDestinationLabel, "Click to open the backup destination folder.");
-
         lastSystemImageBackupLabel = new Label()
         {
-            Location = new Point(10, 410), // Adjust these values to place the label appropriately
+            Location = new Point(10, 350), // Adjust these values to place the label appropriately
             Text = "Last System backup: ",
             AutoSize = true
         };
@@ -303,7 +309,7 @@ class SettingsForm : Form
             AutoSize = true, // Enable auto-sizing to adjust the button's width based on its text content
             AutoSizeMode = AutoSizeMode.GrowAndShrink, // Allow the button to grow and shrink
             Height = 25, // Specify the desired height
-            Text = "Create System Image Backup now",
+            Text = "Create System Image Backup",
         };
         systemImageBackupButton.Click += OnSystemImageBackup;
         Controls.Add(systemImageBackupButton);
@@ -324,6 +330,18 @@ class SettingsForm : Form
         CheckUpdatesButton.Click += CheckUpdatesButton_Click;
         Controls.Add(CheckUpdatesButton);
         LabelToolTip.SetToolTip(CheckUpdatesButton, "Check for updates online.");
+
+        //Get and display backup destination
+        backupDestinationLabel = new Label()
+        {
+            Location = new Point(10, 460), // Adjust these values to place the label appropriately
+            Text = "Backup destination: " + BackupManager.GetBackupDestination(),
+            AutoSize = true
+        };
+        // Subscribe to the Click event to open the destination when clicked
+        backupDestinationLabel.Click += BackupDestinationLabel_Click;
+        Controls.Add(backupDestinationLabel);
+        LabelToolTip.SetToolTip(backupDestinationLabel, "Click to open the backup destination folder.");
 
         // Update the last successful backup label
         UpdateLastSuccessfulBackup();
@@ -466,6 +484,15 @@ class SettingsForm : Form
         };
         closeButton.Click += OnClose;
         Controls.Add(closeButton);
+
+        // create the status strip
+        statusStrip = new StatusStrip();
+        statusLabel = new ToolStripStatusLabel();
+        statusStrip.Items.Add(statusLabel);
+        statusLabel.Text = "Ready";
+        Controls.Add(statusStrip);
+        // Set the status stript text to current status
+        statusStripUpdate("Ready", true);
 
         // Populate the foldersListBox from a file
         if (File.Exists("folders.txt"))
@@ -854,6 +881,54 @@ class SettingsForm : Form
         }
     }
 
+    private void statusStripUpdate(string text, bool checkSettings = false)
+    {
+        if (checkSettings)
+        {
+            // Perform settings check or other initialization tasks
+            CheckSettings();  // This is a hypothetical method that checks settings
+        }
+        else
+        {
+            // Update the status label text
+            statusLabel.Text = text;
+        }
+        // Check if status is not "Ready" and set the status strip color accordingly
+        statusStrip.BackColor = statusLabel.Text != "Ready" ? Color.Red : SystemColors.Control;
+        
+    }
+
+    private void CheckSettings()
+    {
+        // Check application settings and update status based on the results
+
+        // Check if foldersListBox is empty
+        if (foldersListBox.Items.Count == 0)
+        {
+            statusLabel.Text = "No folders selected for backup.";
+        }
+        else
+        {
+            statusLabel.Text = "Ready";
+        }
+
+        // Check if backup destination is set
+        if (string.IsNullOrEmpty(BackupManager.GetBackupDestination()))
+        {
+            statusLabel.Text = "Backup destination not set.";
+        }
+        else // Check if the backup destination is reachable
+        {
+            if (!BackupManager.IsBackupLocationReachable(BackupManager.GetBackupDestination()))
+            {
+                statusLabel.Text = "Backup destination is not reachable.";
+            }
+            else
+            {
+                statusLabel.Text = "Ready";
+            }
+        }
+    }
 
     private void OnSystemImageBackup(object sender, EventArgs e)
     {

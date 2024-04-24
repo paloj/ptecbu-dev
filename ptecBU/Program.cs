@@ -190,7 +190,7 @@ static class Program
         }
     }
 
-    private static void OnBackupNow(object sender, EventArgs e)
+    public static void OnBackupNow(object sender, EventArgs e)
     {
         Debug.WriteLine("Backup now clicked");
         // Check if "-destination" argument is provided
@@ -370,29 +370,6 @@ static class Program
         }
     }
 
-    // Function to stop blinking and reset the icon to green
-    /*
-    public static async Task StopBlinking()
-    {
-        // Stop the blinking
-        IsBackupInProgress = false;
-        try
-        {
-            await BackupManager.BlinkTrayIconAsync(false);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine(ex.Message);
-        }
-        // Update tray icon tooltip after backup completion
-        UpdateTrayIconTooltip();
-        // Check if the icon is set to green. If not, set it to green
-        if (trayIcon.Icon != new Icon("Resources/green.ico"))
-        {
-            trayIcon.Icon = new Icon("Resources/green.ico");
-        }
-    }
-    */
     private static void OnSettings(object sender, EventArgs e)
     {
         // Handle settings clicked

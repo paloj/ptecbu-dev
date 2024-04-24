@@ -14,6 +14,7 @@ public class BackupManager
     private static Task BlinkTask;
     private static Icon GreenIcon;
     private static Icon YellowIcon;
+    private static Icon RedIcon;
 
     public static string GetBackupDestination()
     {
@@ -53,6 +54,9 @@ public class BackupManager
         Debug.WriteLine("Blinking tray icon to indicate backup process has started.");
         GreenIcon = new Icon("Resources/green.ico");
         YellowIcon = new Icon("Resources/yellow.ico");
+        RedIcon = new Icon("Resources/red.ico");
+        //Set the tray icon to the yellow icon
+        Program.trayIcon.Icon = YellowIcon;
         try
         {
             await BlinkTrayIconAsync(true);
@@ -94,6 +98,21 @@ public class BackupManager
             if (!IsBackupLocationReachable(destination))
             {
                 MessageBox.Show($"PtecBU: Destination {destination} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Stop blinking the tray icon and set it to red to indicate the backup process has completed with errors
+                try
+                {
+                    Debug.WriteLine("Stop blinking tray icon to indicate backup process has completed with errors.");
+                    await BlinkTrayIconAsync(false);
+                    //set the tray icon to red
+                    Program.trayIcon.Icon = RedIcon;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
+                    //set the tray icon to red
+                    Program.trayIcon.Icon = RedIcon;
+                }
+
                 return;
             }
 
@@ -579,6 +598,7 @@ public class BackupManager
                 }
             }
             Program.trayIcon.Icon = GreenIcon; // Reset to the default icon when stopped
+            Program.UpdateTrayIconTooltip(); // Update the tray icon tooltip to the default text
         }
     }
 
@@ -587,6 +607,7 @@ public class BackupManager
     {
         GreenIcon?.Dispose();
         YellowIcon?.Dispose();
+        RedIcon?.Dispose();
     }
 
     public static bool IsLastBackupOlderThanOneMonth()   // Check if the last backup was more than a month ago
@@ -653,7 +674,21 @@ public class BackupManager
             if (string.IsNullOrEmpty(path))
                 return false;
 
-            return TryWriteAndDeleteFile(path);
+            // Set up a cancellation token with a 2-second timeout
+            using (CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
+            {
+                try
+                {
+                    // Attempt to write and delete a file in the backup location
+                    Task<bool> task = Task.Run(() => TryWriteAndDeleteFile(path), cts.Token);
+                    return task.Wait(TimeSpan.FromSeconds(2)) && task.Result;  // Wait for the task to complete or timeout
+                }
+                catch (OperationCanceledException ex)
+                {
+                    LogError(ex);
+                    return false;  // Return false if the operation times out
+                }
+            }
         }
         catch (Exception ex)
         {
