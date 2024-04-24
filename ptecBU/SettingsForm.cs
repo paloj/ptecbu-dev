@@ -335,7 +335,7 @@ class SettingsForm : Form
         backupDestinationLabel = new Label()
         {
             Location = new Point(10, 460), // Adjust these values to place the label appropriately
-            Text = "Backup destination: " + BackupManager.GetBackupDestination(),
+            Text = "Backup destination: " + Path.Combine(ConfigurationManager.Config["destination"], Environment.MachineName),
             AutoSize = true
         };
         // Subscribe to the Click event to open the destination when clicked
@@ -396,7 +396,7 @@ class SettingsForm : Form
         includeZipInBackupCheckBox.CheckedChanged += IncludeZipInBackupCheckBox_CheckedChanged;
         Controls.Add(includeZipInBackupCheckBox);
         // Read the value from the config.ini file and set the checkbox accordingly
-        var config = AppConfigManager.ReadConfigIni("config.ini");
+        var config = ConfigurationManager.Config;
         if (config.TryGetValue("includeZipInBackup", out string includeZipInBackupValue))
         {
             includeZipInBackupCheckBox.Checked = includeZipInBackupValue.ToLower() == "true";
@@ -463,7 +463,7 @@ class SettingsForm : Form
         // Subscribe to the ValueChanged event to update the config.ini file
         globalMaxZipRetentionUpDown.ValueChanged += (s, e) =>
         {
-            UpdateConfigIni("defaultMaxZipRetention", globalMaxZipRetentionUpDown.Value.ToString());
+            ConfigurationManager.UpdateIniFile("defaultMaxZipRetention", globalMaxZipRetentionUpDown.Value.ToString());
         };
 
         openConfigFileLinkLabel = new LinkLabel()
@@ -565,7 +565,7 @@ class SettingsForm : Form
         else
         {
             // No individual settings found, load global settings
-            var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
+            var globalConfig = ConfigurationManager.Config;
             backupOptionComboBox.SelectedIndex = globalConfig.ContainsKey("defaultBackupOption")
                 ? int.Parse(globalConfig["defaultBackupOption"])
                 : 0; // Default to 'UseGlobalSetting' if not specified
@@ -895,7 +895,7 @@ class SettingsForm : Form
         }
         // Check if status is not "Ready" and set the status strip color accordingly
         statusStrip.BackColor = statusLabel.Text != "Ready" ? Color.Red : SystemColors.Control;
-        
+
     }
 
     private void CheckSettings()
@@ -913,13 +913,13 @@ class SettingsForm : Form
         }
 
         // Check if backup destination is set
-        if (string.IsNullOrEmpty(BackupManager.GetBackupDestination()))
+        if (string.IsNullOrEmpty(ConfigurationManager.Config["destination"]))
         {
             statusLabel.Text = "Backup destination not set.";
         }
         else // Check if the backup destination is reachable
         {
-            if (!BackupManager.IsBackupLocationReachable(BackupManager.GetBackupDestination()))
+            if (!BackupManager.IsBackupLocationReachable(Path.Combine(ConfigurationManager.Config["destination"], Environment.MachineName)))
             {
                 statusLabel.Text = "Backup destination is not reachable.";
             }
@@ -932,23 +932,7 @@ class SettingsForm : Form
 
     private void OnSystemImageBackup(object sender, EventArgs e)
     {
-        string settingsIniPath = "config.ini";
-        string destination = null;
-
-        if (File.Exists(settingsIniPath))
-        {
-            var lines = File.ReadAllLines(settingsIniPath);
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("systemimagedestination="))
-                {
-                    destination = line.Substring("systemimagedestination=".Length).Trim();
-                    break;
-                }
-            }
-        }
-
-        if (string.IsNullOrEmpty(destination))
+        if (string.IsNullOrEmpty(ConfigurationManager.Config["systemimagedestination"]))
         {
             MessageBox.Show("Set system image backup destination in config.ini", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
@@ -960,7 +944,7 @@ class SettingsForm : Form
             ProcessStartInfo psi = new()
             {
                 FileName = "system_backup.bat",
-                Arguments = destination,
+                Arguments = ConfigurationManager.Config["systemimagedestination"],
                 Verb = "runas", // This ensures the process is run as administrator
                 UseShellExecute = true, // This is necessary to allow the "runas" verb
             };
@@ -997,63 +981,20 @@ class SettingsForm : Form
     private void IncludeZipInBackupCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         // Update config.ini with the new value
-        UpdateConfigIni("includeZipInBackup", includeZipInBackupCheckBox.Checked ? "true" : "false");
+        ConfigurationManager.UpdateIniFile("includeZipInBackup", includeZipInBackupCheckBox.Checked ? "true" : "false");
     }
 
     private void OnlyMakeZipBackupCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         // Update config.ini with the new value
-        UpdateConfigIni("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
+        ConfigurationManager.UpdateIniFile("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
     }
 
     private void GlobalSkipCompareCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         // Update config.ini with the new value
-        UpdateConfigIni("skipZipfileComparison", globalSkipCompareCheckBox.Checked ? "true" : "false");
+        ConfigurationManager.UpdateIniFile("skipZipfileComparison", globalSkipCompareCheckBox.Checked ? "true" : "false");
     }
-
-    private void UpdateConfigIni(string key, string value)
-    {
-        // Define the path to the config.ini file
-        string filePath = "config.ini";
-
-        // Check if the config file exists
-        if (!File.Exists(filePath))
-        {
-            Console.WriteLine("Config file not found.");
-            return;
-        }
-
-        // Read all lines from the config file
-        var lines = File.ReadAllLines(filePath).ToList();
-
-        // Flag to check if key is found and updated
-        bool keyFound = false;
-
-        // Go through each line to find and update the key
-        for (int i = 0; i < lines.Count; i++)
-        {
-            // Check if the line contains the key (ignoring comment lines)
-            if (!lines[i].TrimStart().StartsWith("//") && lines[i].Contains(key))
-            {
-                // Replace the line with the new key-value pair
-                lines[i] = $"{key}={value}";
-                keyFound = true;
-                break; // Exit the loop since the key has been found and updated
-            }
-        }
-
-        // If the key wasn't found in the existing lines, add it as a new entry
-        if (!keyFound)
-        {
-            lines.Add($"{key}={value}");
-        }
-
-        // Write the updated lines back to the config file
-        File.WriteAllLines(filePath, lines);
-    }
-
-
 
     private void CheckUpdatesButton_Click(object sender, EventArgs e)
     {
@@ -1128,40 +1069,3 @@ public enum BackupOptions
     OnlyMakeZipBackup,
     IncludeZipInNormalBackup
 }
-
-// Helper class to manage the application configuration
-public static class AppConfigManager
-{
-    public static Dictionary<string, string> ReadConfigIni(string filePath)
-    {
-        var config = new Dictionary<string, string>();
-
-        // Check if the file exists to avoid FileNotFoundException
-        if (File.Exists(filePath))
-        {
-            var lines = File.ReadAllLines(filePath);
-            foreach (var line in lines)
-            {
-                // Skip empty lines and comments
-                if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith(";"))
-                {
-                    var parts = line.Split('=', 2); // Split the line into key and value
-                    if (parts.Length == 2)
-                    {
-                        var key = parts[0].Trim();
-                        var value = parts[1].Trim();
-                        config[key] = value;
-                    }
-                }
-            }
-        }
-        else
-        {
-            // Optionally, log the error or throw an exception if the file is not found
-            MessageBox.Show($"Configuration file not found: {filePath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-
-        return config;
-    }
-}
-

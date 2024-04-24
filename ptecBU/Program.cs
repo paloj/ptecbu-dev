@@ -2,6 +2,7 @@
 // dotnet publish -c Release -r win-x64 --self-contained false
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Globalization;
 
 static class Program
 {
@@ -10,8 +11,11 @@ static class Program
     public static bool destinationReachable;
     public static bool IsRunningWithArguments { get; private set; }
     public static bool IsBackupInProgress = false;
-    public static string TickFolderSource = "folders.txt";
+    public static string FolderSource = "folders.txt";
+    public static string ExcludeListSource = "excludedItems.txt";
+    public static bool FolderListNotEmpty = false;
     public static Process RobocopyProcess;
+    public static int BackupTimerInterval = 60000; // 1 minute
 
 
     [STAThread]
@@ -40,20 +44,31 @@ static class Program
             UpdateConfigIniFile("config.ini");
         }
 
+        // Load the configuration file
+        ConfigurationManager.LoadConfig("config.ini");
+        // Update the configuration with command line arguments
+        ProcessCommandLineArguments(args);
+
         //Variable to tell the backupmanager if program is started with arguments. then no trayicon actions
         IsRunningWithArguments = args.Length > 0;
 
-        // Check for "-delay" argument
-        if (args.Length > 0 && args[0] == "-delay")
+        string value; // Variable to store the value of the configuration key
+
+        // Check for "-delay" argument in ConfigurationManager.Config
+        if (ConfigurationManager.Config.TryGetValue("delay", out value) && int.TryParse(value, out int delay))
         {
-            System.Threading.Thread.Sleep(40000); // Delay for 40 seconds
+            // Delay the program for the specified time
+            System.Threading.Thread.Sleep(delay); // Delay for 40 seconds
         }
 
-        // Check for arguments
-        string customDestination = GetCustomDestination(args);
-        string FolderSource = GetCustomFolderSource(args);
-        TickFolderSource = FolderSource;
-        string ExcludeListSource = GetCustomExcludeListSource(args);
+        // FonderSource and ExcludeListSource are the default sources for the folder list and exclude item list
+        // Read the FolderSource from ConfigurationManager.Config and use the default if not found
+        FolderSource = ConfigurationManager.Config.TryGetValue("foldersource", out value) ? value : "folders.txt";
+        // Read the ExcludeListSource from ConfigurationManager.Config and use the default if not found
+        string ExcludeListSource = ConfigurationManager.Config.TryGetValue("excludesource", out value) ? value : "excludedItems.txt";
+
+        // Check that the folders list has content
+        IsFolderListNotEmpty(FolderSource);
 
         // Check that custom foldersource and excludeitemlist exist
         if (!File.Exists(FolderSource))
@@ -69,12 +84,12 @@ static class Program
         }
 
         // If -now argument is given then we dont open the tray app. Just do the backup in the background.
-        if (args.Contains("-now"))
+        if (ConfigurationManager.Config.TryGetValue("now", out value) && value == "1")
         {
             // Perform backup with the custom destination if provided
             try
             {
-                await BackupManager.PerformBackup(customDestination, FolderSource, ExcludeListSource, true);
+                await BackupManager.PerformBackup(true);
             }
             catch (Exception ex)
             {
@@ -131,8 +146,8 @@ static class Program
             ShowSettingsForm();
 #endif
 
-            // Check for "-s" argument to open settings form
-            if (args.Length > 0 && args[0] == "-s")
+            // Check for "-s" argument in config to open settings form
+            if (ConfigurationManager.Config.TryGetValue("s", out value) && value == "1")
             {
                 Debug.WriteLine("-s argument found");
                 ShowSettingsForm();
@@ -163,6 +178,25 @@ static class Program
         OnExit(sender, e);
     }
 
+    // Function to check if folders list has content
+    public static bool IsFolderListNotEmpty(string source)
+    {
+        // Check that the folders list has content
+        if (File.Exists(source))
+        {
+            string[] lines = File.ReadAllLines(source);
+            if (lines.Length > 0)
+            {
+                FolderListNotEmpty = true;
+            }
+            else
+            {
+                FolderListNotEmpty = false;
+            }
+        }
+        return FolderListNotEmpty;
+    }
+
     private static void SystemEvents_SessionSwitch(object sender, SessionSwitchEventArgs e)
     {
         switch (e.Reason)
@@ -190,15 +224,80 @@ static class Program
         }
     }
 
+    private static void ProcessCommandLineArguments(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "-destination":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("destination", args[i + 1]);
+                    break;
+                // Handle other arguments similarly
+                case "-autobackup":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("autobackup", args[i + 1]);
+                    break;
+                case "-hoursbetweenbackups":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("hoursbetweenbackups", args[i + 1]);
+                    break;
+                case "-robocopymt":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("robocopymt", args[i + 1]);
+                    break;
+                case "-twobackups":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("twobackups", args[i + 1]);
+                    break;
+                case "-includeZipInBackup":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("includeZipInBackup", args[i + 1]);
+                    break;
+                case "-onlyMakeZipBackup":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("onlyMakeZipBackup", args[i + 1]);
+                    break;
+                case "-skipZipfileComparison":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("skipZipfileComparison", args[i + 1]);
+                    break;
+                case "-defaultMaxZipRetention":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("defaultMaxZipRetention", args[i + 1]);
+                    break;
+                case "-systemimagedestination":
+                    if (i + 1 < args.Length) ConfigurationManager.UpdateConfig("systemimagedestination", args[i + 1]);
+                    break;
+                case "-foldersource":   // Custom folder list source
+                case "-f":
+                    if (i + 1 < args.Length) FolderSource = args[i + 1];
+                    break;
+                case "-excludesource":  // Custom exclude item list source
+                case "-e":
+                    if (i + 1 < args.Length) FolderSource = args[i + 1];
+                    break;
+                case "-now":
+                    // set a flag to config to perform the backup immediately
+                    ConfigurationManager.UpdateConfig("now", "1");
+                    break;
+                case "-delay":
+                    // Handle delay argument
+                    ConfigurationManager.UpdateConfig("delay", args[i + 1]);
+                    break;
+                case "-s":
+                    break;
+                case "-debug":
+                    // Enable debug mode by setting DEBUG constant?
+                    break;
+                case "-help":
+                    // Display help information
+                    break;
+                case "-version":
+                    // Display version information
+                    break;
+                case "-exit":
+                    // Exit the application
+                    break;
+            }
+        }
+    }
+
     public static void OnBackupNow(object sender, EventArgs e)
     {
         Debug.WriteLine("Backup now clicked");
-        // Check if "-destination" argument is provided
-        string customDestination = null;
-        if (Environment.GetCommandLineArgs().Length > 2 && Environment.GetCommandLineArgs()[1] == "-destination")
-        {
-            customDestination = Environment.GetCommandLineArgs()[2];
-        }
 
         // Start the backup process on a separate thread
         IsBackupInProgress = true;
@@ -208,7 +307,8 @@ static class Program
             {
                 try
                 {
-                    await BackupManager.PerformBackup(customDestination);
+                    // Perform backup using the ConfigurationManager destination
+                    await BackupManager.PerformBackup();
                 }
                 catch (Exception ex)
                 {
@@ -295,7 +395,7 @@ static class Program
     {
         string filePath = "log/lastBackup.log"; // replace with your path
 
-        if (BackupManager.IsBackupLocationReachable())
+        if (BackupManager.IsBackupLocationReachable(ConfigurationManager.Config["destination"]))
         {
             Program.destinationReachable = true;
         }
@@ -396,68 +496,6 @@ static class Program
         Application.Exit();
     }
 
-    private static string GetCustomDestination(string[] args)
-    {
-        // Look for the -destination argument in the command line arguments
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] == "-destination" || args[i] == "-d")
-            {
-                return args[i + 1];
-            }
-        }
-
-        // If the -destination argument is not found, check the config.ini file
-        string configPath = "config.ini";
-        string destinationKey = "destination=";
-        string defaultValue = @"\\127.0.0.1\backup\";
-
-        if (File.Exists(configPath))
-        {
-            string[] configLines = File.ReadAllLines(configPath);
-            string destinationLine = configLines.FirstOrDefault(line => line.StartsWith(destinationKey, StringComparison.OrdinalIgnoreCase));
-
-            if (destinationLine != null)
-            {
-                string customDestination = destinationLine.Substring(destinationKey.Length).Trim();
-                return customDestination;
-            }
-        }
-
-        // Return the default value if no custom destination is found
-        return defaultValue;
-    }
-
-    private static string GetCustomFolderSource(string[] args)
-    {
-        // Look for the -foldersource argument in the command line arguments
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] == "-foldersource" || args[i] == "-f")
-            {
-                return args[i + 1];
-            }
-        }
-
-        // Return the default value if no custom folder list source is found
-        return "folders.txt";
-    }
-
-    private static string GetCustomExcludeListSource(string[] args)
-    {
-        // Look for the -foldersource argument in the command line arguments
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i] == "-excludesource" || args[i] == "-e")
-            {
-                return args[i + 1];
-            }
-        }
-
-        // Return the default value if no custom exclude item list is found
-        return "excludedItems.txt";
-    }
-
     // Function to update missing lines to the config.ini file
     private static void UpdateConfigIniFile(string configPath)
     {
@@ -513,6 +551,101 @@ static class Program
     }
 }
 
+// Class to manage the configuration file
+public static class ConfigurationManager
+{
+    public static Dictionary<string, string> Config { get; private set; } = new Dictionary<string, string>();   // Dictionary to store the configuration values
+
+    public static void LoadConfig(string filePath)
+    {
+        Config.Clear();
+        if (File.Exists(filePath))
+        {
+            var lines = File.ReadAllLines(filePath);
+            foreach (var line in lines)
+            {
+                if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith(";") && line.Contains('='))
+                {
+                    var parts = line.Split('=', 2);
+                    if (parts.Length == 2)
+                    {
+                        var key = parts[0].Trim();
+                        var value = parts[1].Trim();
+                        Config[key] = value;
+                    }
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine($"Configuration file not found: {filePath}");
+        }
+    }
+
+    public static void SaveConfig(string filePath)
+    {
+        var lines = Config.Select(kv => $"{kv.Key}={kv.Value}");
+        File.WriteAllLines(filePath, lines);
+    }
+
+    public static void UpdateConfig(string key, string value)
+    {
+        if (Config.ContainsKey(key))
+        {
+            Config[key] = value;
+        }
+        else
+        {
+            Config.Add(key, value);
+        }
+    }
+
+    public static bool UpdateIniFile(string key, string value, string filePath = "config.ini")
+    {
+        try
+        {
+            // Read all lines from the configuration file
+            var lines = File.ReadAllLines(filePath).ToList();
+            bool found = false;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                // Split the line into key and value parts to handle cases with spaces and comments
+                var lineParts = lines[i].Split('=', 2);
+                if (lineParts.Length == 2 && lineParts[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Update the line with the new value
+                    lines[i] = key + "=" + value;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                // Append the new key-value pair to the list ensuring proper newline handling
+                if (lines.Count > 0 && !lines.Last().EndsWith(Environment.NewLine))
+                {
+                    lines.Add(""); // Add a new line if the last line does not end with a newline
+                }
+                lines.Add(key + "=" + value);
+            }
+            // Write the updated lines back to the file
+            File.WriteAllLines(filePath, lines);
+
+            // Reload the configuration to reflect changes
+            LoadConfig(filePath);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine("Error updating ini file: " + ex.Message);
+            return false;
+        }
+    }
+
+}
+
+
 class CustomApplicationContext : ApplicationContext
 {
     private NotifyIcon trayIcon;
@@ -522,8 +655,8 @@ class CustomApplicationContext : ApplicationContext
     {
         this.trayIcon = trayIcon;
 
-        // Check the value of autobackup from the config.ini file
-        if (IsAutoBackupEnabled())
+        // Check the value of autobackup from the configuration
+        if (ConfigurationManager.Config.ContainsKey("autobackup") && ConfigurationManager.Config["autobackup"] == "1")
         {
             // Create the backup timer
             CreateBackupTimer();
@@ -535,38 +668,15 @@ class CustomApplicationContext : ApplicationContext
     {
         backupTimer = new System.Windows.Forms.Timer
         {
-            Interval = 60000 // 1 minutes
+            Interval = Program.BackupTimerInterval
         };
         backupTimer.Tick += new EventHandler(BackupTimer_Tick);
         backupTimer.Start();
     }
 
-    private bool IsAutoBackupEnabled()
-    {
-        // Read the config.ini file and check the value of autobackup
-        string configFilePath = "config.ini";
-        if (File.Exists(configFilePath))
-        {
-            string[] lines = File.ReadAllLines(configFilePath);
-            foreach (string line in lines)
-            {
-                if (line.Trim().Equals("autobackup=1", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Write to log file that autobackup is enabled. Overwrite the file if it already exists
-                    using (StreamWriter sw = File.CreateText("log/autobackupEnabled.log"))
-                    {
-                        sw.WriteLine(DateTime.Now.ToString());
-                    }
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private static void BackupTimer_Tick(object sender, EventArgs e)
     {
-        string filePath = Program.TickFolderSource;
+        string filePath = Program.FolderSource;
 
         // Write to log file that the backup timer ticked. Overwrite the file if it already exists
         using (StreamWriter sw = File.CreateText("log/backupTimerTick.log"))
@@ -574,8 +684,11 @@ class CustomApplicationContext : ApplicationContext
             sw.WriteLine(DateTime.Now.ToString());
         }
 
-        // Check if a list of folders to be backed up exist
-        if (File.Exists(filePath))
+        // Check if the folder list has content
+        Program.IsFolderListNotEmpty(filePath);
+
+        // If the folder list has content, proceed with the backup process
+        if (Program.FolderListNotEmpty)
         {
             string[] lines = File.ReadAllLines(filePath);
             if (lines.Length >= 1)
@@ -584,23 +697,14 @@ class CustomApplicationContext : ApplicationContext
                 if (BackupManager.IsLastBackupOlderThanConfigHours() && !Program.IsBackupInProgress)
                 {
                     // Check if a connection to the backup location exists
-                    if (BackupManager.IsBackupLocationReachable())
+                    if (BackupManager.IsBackupLocationReachable(ConfigurationManager.Config["destination"]))
                     {
                         Program.destinationReachable = true;
 
-                        string configPath = "config.ini";
-                        string destinationKey = "destination=";
-                        string tickDestination = @"\\127.0.0.1\backup\";
-
-                        if (File.Exists(configPath))
+                        // Set the backup timer interval to the configured value
+                        if (Program.BackupTimerInterval != 60000)
                         {
-                            string[] configLines = File.ReadAllLines(configPath);
-                            string destinationLine = configLines.FirstOrDefault(line => line.StartsWith(destinationKey, StringComparison.OrdinalIgnoreCase));
-
-                            if (destinationLine != null)
-                            {
-                                tickDestination = destinationLine.Substring(destinationKey.Length).Trim();
-                            }
+                            Program.BackupTimerInterval = 60000; // 1 minute
                         }
 
                         // Start the backup process on a separate thread
@@ -610,7 +714,7 @@ class CustomApplicationContext : ApplicationContext
                             try
                             {
                                 Debug.WriteLine("Backup timer ticked and starting backup process.");
-                                await BackupManager.PerformBackup(tickDestination);
+                                await BackupManager.PerformBackup();
                             }
                             catch (Exception ex)
                             {
@@ -625,6 +729,9 @@ class CustomApplicationContext : ApplicationContext
                         // Change the tray icon to red
                         Program.trayIcon.Icon = new Icon("Resources/red.ico");
                         Program.destinationReachable = false;
+
+                        // Change backup timer interval to 5 minutes if the destination is unreachable
+                        Program.BackupTimerInterval = 300000; // 5 minutes
                     }
                 }
             }

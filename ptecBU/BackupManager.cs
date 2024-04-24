@@ -7,8 +7,7 @@ using System.Text.RegularExpressions;
 public class BackupManager
 {
     static string hostname = Environment.MachineName;
-    static string Destination = GetBackupDestination();
-
+    public static string backupDestination = Path.Combine(ConfigurationManager.Config["destination"], hostname);
     public static bool IsBlinking { get; private set; }
     private static CancellationTokenSource BlinkCancellationTokenSource;
     private static Task BlinkTask;
@@ -16,32 +15,14 @@ public class BackupManager
     private static Icon YellowIcon;
     private static Icon RedIcon;
 
-    public static string GetBackupDestination()
-    {
-        string configPath = "config.ini";
-        string destinationKey = "destination=";
-        string defaultValue = @"\\127.0.0.1\backup\";
-
-        if (File.Exists(configPath))
-        {
-            string[] configLines = File.ReadAllLines(configPath);
-            string destinationLine = configLines.FirstOrDefault(line => line.StartsWith(destinationKey, StringComparison.OrdinalIgnoreCase));
-
-            if (destinationLine != null)
-            {
-                string customDestination = destinationLine.Substring(destinationKey.Length).Trim();
-                return Path.Combine(customDestination, hostname);
-            }
-        }
-
-        return Path.Combine(defaultValue, hostname);
-    }
-
-    public static async Task PerformBackup(string customDestination = null, string folderSource = "folders.txt", string excludeSource = "excludedItems.txt", bool exitAfter = false)
+    public static async Task PerformBackup(bool exitAfter = false)
     {
         // Initialize the stopwatch at the start of the backup process
         Stopwatch backupTimer = new Stopwatch();
         backupTimer.Start();
+
+        // Set the destination path for the backup
+        backupDestination = Path.Combine(ConfigurationManager.Config["destination"], hostname);
 
         // Ensure the log file is clear or create it if not existing
         string logFilePath = "log/backupDuration.log";
@@ -67,13 +48,14 @@ public class BackupManager
         }
 
         // Load global settings
-        var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
+        var globalConfig = ConfigurationManager.Config;
 
         // Load individual folder settings
         var folderConfigs = FolderConfigManager.LoadFolderConfigs();
 
+        bool onlyMakeZipBackupGlobal = false;
         // If onlyMakeZipBackup is true, perform only the zip backup and skip robocopy
-        if (IsOnlyMakeZipBackupEnabled())
+        if (ConfigurationManager.Config.TryGetValue("onlyMakeZipBackup", out var value) && bool.TryParse(value, out onlyMakeZipBackupGlobal) && onlyMakeZipBackupGlobal)
         {
             var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
             try
@@ -90,14 +72,10 @@ public class BackupManager
         {
             //CONTINUE WITH ROBOCOPY BACKUP
 
-            // Use the customDestination if provided, otherwise use the default destination
-            // Append the hostname to the customDestination before using it
-            string destination = customDestination != null ? Path.Combine(customDestination, hostname) : Destination;
-
             // Check if the backup location is reachable
-            if (!IsBackupLocationReachable(destination))
+            if (!IsBackupLocationReachable(backupDestination))
             {
-                MessageBox.Show($"PtecBU: Destination {destination} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"PtecBU: Destination {backupDestination} unreachable.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 // Stop blinking the tray icon and set it to red to indicate the backup process has completed with errors
                 try
                 {
@@ -117,13 +95,13 @@ public class BackupManager
             }
 
             // Load folders to backup
-            string[] folders = File.Exists(folderSource)
-                ? File.ReadAllLines(folderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+            string[] folders = File.Exists(Program.FolderSource)
+                ? File.ReadAllLines(Program.FolderSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
                 : new string[0];
 
             // Load excluded items list
-            string[] excludedItems = File.Exists(excludeSource)
-                ? File.ReadAllLines(excludeSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+            string[] excludedItems = File.Exists(Program.ExcludeListSource)
+                ? File.ReadAllLines(Program.ExcludeListSource).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
                 : new string[0];
 
             // Update tray icon tooltip to "Backup in progress"
@@ -176,7 +154,7 @@ public class BackupManager
 
             string excludeParams = excludeDirsParams + excludeFilesParams;
 
-            bool isTwoBackupsEnabled = IsTwoBackupsEnabled();
+            bool isTwoBackupsEnabled = bool.Parse(globalConfig.GetValueOrDefault("twobackups", "false"));
             string destinationSuffix = "";
 
             if (isTwoBackupsEnabled)
@@ -202,8 +180,8 @@ public class BackupManager
             // Perform backup for each folder
             for (int i = 0; i < folders.Length; i++)
             {
-                var onlyMakeZipBackup = false;
-                var includeZipInBackup = false;
+                bool onlyMakeZipBackup = false;
+                bool includeZipInBackup = false;
                 folderConfigs.TryGetValue(folders[i], out var folderConfig);
 
                 // Check folders individual settings for 'BackupOption' from folderConfigs. Skip robocopy if the folder is zip only (BackupOption=1)
@@ -251,7 +229,7 @@ public class BackupManager
                 }
 
                 // Build the destination path
-                string folderDestination = Path.Combine(destination, folderNameForDestination + destinationSuffix);
+                string folderDestination = Path.Combine(backupDestination, folderNameForDestination + destinationSuffix);
 
                 // Validate the folderDestination path
                 if (PathValidator.IsValidPath(folderDestination))
@@ -260,8 +238,8 @@ public class BackupManager
                     folder = folder.TrimEnd('\\');
                     folderDestination = folderDestination.TrimEnd('\\');
 
-                    // Read MT value from config.ini
-                    string mtValue = ReadMTValueFromConfig();
+                    // Read robocopymt value from config dictionary
+                    string mtValue = globalConfig.GetValueOrDefault("robocopymt", "16");
 
                     // Build robocopy command
                     string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:log/backup_{i + 1}.log {excludeParams} /A-:SH";
@@ -389,7 +367,8 @@ public class BackupManager
             File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy total duration: {robocopyDuration}\n");
 
             // Add zip to backup if enabled in config.ini and not set to only make zip backups
-            if (!IsOnlyMakeZipBackupEnabled())
+            bool includeZipInBackupGlobal = false; // Default to false if not specified or invalid
+            if (bool.TryParse(globalConfig.GetValueOrDefault("includeZipInBackup", "false"), out includeZipInBackupGlobal) && includeZipInBackupGlobal && !onlyMakeZipBackupGlobal)
             {
                 // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
                 var archiver = new FolderArchiver();                    // Create a new instance of the FolderArchiver class
@@ -431,84 +410,6 @@ public class BackupManager
         {
             Application.Exit();
         }
-    }
-
-    private static string ReadMTValueFromConfig() // Read the MT value from config.ini that is used in robocopy to set the number of threads
-    {
-        string mtValue = "16"; // Default value
-        if (File.Exists("config.ini"))
-        {
-            foreach (var line in File.ReadLines("config.ini"))
-            {
-                if (line.StartsWith("robocopymt="))
-                {
-                    mtValue = line.Substring("robocopymt=".Length);
-                    break;
-                }
-            }
-        }
-        return mtValue;
-    }
-
-    private static bool IsTwoBackupsEnabled() // Check if the twobackups setting is enabled in config.ini
-    {
-        string configPath = "config.ini";
-        string backupKey = "twobackups=";
-
-        if (File.Exists(configPath))
-        {
-            string[] configLines = File.ReadAllLines(configPath);
-            string backupLine = configLines.FirstOrDefault(line => line.StartsWith(backupKey, StringComparison.OrdinalIgnoreCase));
-
-            if (backupLine != null)
-            {
-                string backupValue = backupLine.Substring(backupKey.Length).Trim().ToLower();
-                return backupValue == "true";
-            }
-        }
-
-        // Return false as default if the config file or twobackups setting does not exist
-        return false;
-    }
-
-    private static bool IsZipInBackupEnabled()  // Check if the includeZipInBackup setting is enabled in config.ini
-    {
-        string configPath = "config.ini";
-        string zipKey = "includeZipInBackup="; // Key to look for in the config file
-
-        if (File.Exists(configPath))
-        {
-            string[] configLines = File.ReadAllLines(configPath);
-            // Find the first line that starts with the zipKey, ignoring case
-            string zipLine = configLines.FirstOrDefault(line => line.StartsWith(zipKey, StringComparison.OrdinalIgnoreCase));
-
-            if (zipLine != null)
-            {
-                // Extract the value part after the '=' and trim any whitespace, then compare it with "true"
-                string zipValue = zipLine.Substring(zipKey.Length).Trim().ToLower();
-                return zipValue == "true"; // Return true if the setting's value is "true"
-            }
-        }
-
-        // Return false as default if the config file does not exist or the includeZipInBackup setting is not found or not set to true
-        return false;
-    }
-
-    private static bool IsOnlyMakeZipBackupEnabled()    // Check if the onlyMakeZipBackup setting is enabled in config.ini
-    {
-        string configPath = "config.ini";
-        string onlyMakeZipBackupKey = "onlyMakeZipBackup=";
-        if (File.Exists(configPath))
-        {
-            var configLines = File.ReadAllLines(configPath);
-            var onlyMakeZipBackupLine = configLines.FirstOrDefault(line => line.StartsWith(onlyMakeZipBackupKey, StringComparison.OrdinalIgnoreCase));
-            if (onlyMakeZipBackupLine != null)
-            {
-                var onlyMakeZipBackupValue = onlyMakeZipBackupLine.Substring(onlyMakeZipBackupKey.Length).Trim().ToLower();
-                return onlyMakeZipBackupValue == "true";
-            }
-        }
-        return false; // Return false by default if the setting is not found or not true
     }
 
     public static class PathValidator
@@ -632,44 +533,48 @@ public class BackupManager
 
     public static bool IsLastBackupOlderThanConfigHours() // Check if the last backup was older than the defined hours in config.ini
     {
-        string[] lines = File.ReadAllLines("config.ini");
-        string betweenKey = "hoursbetweenbackups=";
-        int hours = 24; // Default to 24 hours
-
-        foreach (var line in lines)
-        {
-            if (line.StartsWith(betweenKey))
-            {
-                if (!int.TryParse(line.Substring(betweenKey.Length), out hours))
-                {
-                    // If the hours can't be parsed, assume the last backup was too old
-                    return true;
-                }
-                break;
-            }
-        }
-
+        // Check if the log file exists
         if (!File.Exists("log/lastBackup.log"))
         {
-            return true;
+            Debug.WriteLine("No lastBackup.log file found.");
+            return true; // Assume backup is needed if no log file exists
         }
 
+        // Read the timestamp from the log file
         string timestampStr = File.ReadAllText("log/lastBackup.log");
         DateTime lastBackup;
+
+        // Try to parse the stored DateTime using the exact format
         if (!DateTime.TryParseExact(timestampStr, "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out lastBackup))
         {
-            return true;
+            Debug.WriteLine("Failed to parse the last backup timestamp.");
+            return true; // Assume backup is needed if parsing fails
         }
 
-        return DateTime.Now - lastBackup > TimeSpan.FromHours(hours);
+        Debug.WriteLine($"Last backup: {lastBackup}");
+        Debug.WriteLine($"Current time: {DateTime.Now}");
+        Debug.WriteLine($"Difference: {DateTime.Now - lastBackup}");
+
+        // Safely retrieve and parse the backup interval hours from the configuration
+        if (ConfigurationManager.Config.TryGetValue("hoursbetweenbackups", out string hoursStr) && int.TryParse(hoursStr, out int hours))
+        {
+            Debug.WriteLine($"Config hours: {hours}");
+            return DateTime.Now - lastBackup > TimeSpan.FromHours(hours);
+        }
+        else
+        {
+            Debug.WriteLine("Failed to retrieve or parse 'hoursbetweenbackups' from config.");
+            return true; // Default to needing a backup if the interval is not properly defined or parsing failed
+        }
     }
 
+
     // Check if backup location is reachable on network or in local drive
-    public static bool IsBackupLocationReachable(string destination = null)
+    public static bool IsBackupLocationReachable(string customDestination = null)
     {
         try
         {
-            string path = destination ?? GetBackupDestination();
+            string path = customDestination ?? backupDestination;
 
             if (string.IsNullOrEmpty(path))
                 return false;

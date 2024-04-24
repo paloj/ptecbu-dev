@@ -188,7 +188,7 @@ public class FolderArchiver
 
             // Load folder configs
             var folderConfigs = FolderConfigManager.LoadFolderConfigs();
-            var globalConfig = AppConfigManager.ReadConfigIni("config.ini");
+            var globalConfig = ConfigurationManager.Config;
 
             // Log the start of archiving
             await AsyncFileLogger.LogAsync("Archiving started.");
