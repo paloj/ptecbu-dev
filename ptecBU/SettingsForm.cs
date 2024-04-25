@@ -2,9 +2,11 @@ using System.Windows.Forms;
 using System.Reflection;
 using System.Diagnostics;
 using System.Text.Json;
+using BlueMystic;
 
 class SettingsForm : Form
 {
+    private DarkModeCS DM = null; //<- Line 1
     private ListBox foldersListBox;
     private Button addFolderButton;
     private Button removeFolderButton;
@@ -59,6 +61,7 @@ class SettingsForm : Form
 
     public SettingsForm()
     {
+        DM = new DarkModeCS(this);
         // Get the current assembly
         var assembly = Assembly.GetExecutingAssembly();
         // Get the version of the current assembly
@@ -68,15 +71,21 @@ class SettingsForm : Form
         Text = $"PtecBU Settings - App version: {version}";
         Size = new Size(670, 540);
         FormBorderStyle = FormBorderStyle.FixedSingle; // Make the form non-resizable
-
+        MaximizeBox = false; // Disable the maximize button
         // Set the form's icon
         this.Icon = new Icon("Resources/white.ico");
 
         // create the status strip
         statusStrip = new StatusStrip();
+        // Add frame border to the status strip
+        statusStrip.SizingGrip = false;
+        // Add the status label to the status strip
         statusLabel = new ToolStripStatusLabel();
         statusStrip.Items.Add(statusLabel);
         statusLabel.Text = "Ready";
+        // Add margin to the status label
+        statusLabel.Margin = new Padding(10, 0, 0, 0);
+        // Add the status strip to the form's controls
         Controls.Add(statusStrip);
         // Subscribe to the BackupManager's StatusUpdated event to update the status label
         BackupManager.StatusUpdated += UpdateStatusLabelSafe;

@@ -101,6 +101,8 @@ static class Program
             // Ensure Windows Forms is properly initialized
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+
 
             // Check if folders.txt exists
             if (!File.Exists(FolderSource))
@@ -371,7 +373,7 @@ static class Program
 
         UpdateTrayMenuItem();
         // Restart the application to ensure proper cleanup
-        //Application.Restart();
+        Application.Restart();
     }
 
     public static void UpdateTrayMenuItem()
