@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.VisualBasic.Logging;
+using System.Windows.Forms;
 
 public class FileInfoItem
 {
@@ -14,13 +15,13 @@ public class FileInfoItem
 
 public class FolderArchiver
 {
-    private Label statusLabel;
+    private Action<string> updateStatusAction;
     private string destinationPath;
     private const string ExcludedItemsPath = "excludedItems.txt";
 
-    public FolderArchiver(Label statusLabel = null)
+    public FolderArchiver(Action<string> updateStatusAction)
     {
-        this.statusLabel = statusLabel;
+        this.updateStatusAction = updateStatusAction;
         ReadConfig();
     }
 
@@ -59,10 +60,7 @@ public class FolderArchiver
         catch (Exception ex)
         {
             await AsyncFileLogger.LogAsync($"Error scanning directory: {ex.Message}");
-            if (statusLabel != null)
-            {
-                UpdateStatusLabel($"Error scanning directory: {ex.Message}");
-            }
+            UpdateStatusLabel($"Error scanning directory: {ex.Message}");
             return filesList;
         }
     }
@@ -124,11 +122,7 @@ public class FolderArchiver
         catch (Exception ex)
         {
             AsyncFileLogger.Log($"Error reading config file: {ex.Message}");
-
-            if (statusLabel != null)
-            {
-                UpdateStatusLabel($"Error reading config file: {ex.Message}");
-            }
+            UpdateStatusLabel($"Error reading config file: {ex.Message}");
         }
     }
 
@@ -171,6 +165,7 @@ public class FolderArchiver
 
     public async Task ArchiveFolders(bool prompt = true)
     {
+        Debug.WriteLine("Starting archiving process. prompt: " + prompt);
         // Start timer to measure the time taken for archiving
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
@@ -199,6 +194,11 @@ public class FolderArchiver
                 try
                 {
                     Debug.WriteLine($"Processing folder: {folder}");
+                    // Update the UI status label if prompt is true
+                    if (prompt)
+                    {
+                        UpdateStatusLabel("Applying exclusions for: " + folder);
+                    }
                     FolderConfig folderConfig = folderConfigs.ContainsKey(folder) ? folderConfigs[folder] : new FolderConfig { BackupOption = BackupOptions.UseGlobalSetting };
                     string includeZipInBackup = globalConfig.TryGetValue("includeZipInBackup", out includeZipInBackup) ? includeZipInBackup : "true";
 
@@ -272,6 +272,12 @@ public class FolderArchiver
                     var files = results[index]; // Get the list of files for the folder
                     Debug.WriteLine($"Starting to check archive necessity for folder: {folder} with {files.Count} files.");
 
+                    // Update the UI status label if prompt is true
+                    if (prompt)
+                    {
+                        UpdateStatusLabel("Comparing files for: " + folder);
+                    }
+
                     bool needsArchive = await ShouldCreateNewArchiveAsync(folder, files, folderConfig, globalConfig);
                     string statusMessage = $"Archive check complete for {folder}: " + (needsArchive ? "New archive needed." : "No new archive needed.");
 
@@ -344,6 +350,7 @@ public class FolderArchiver
         int totalFolders = folders.Count;
         for (int i = 0; i < totalFolders; i++)
         {
+            UpdateStatusLabel($"Archiving ({i + 1}/{totalFolders}): {folders[i]}");
             // Timer to measure the time taken for each folder
             Stopwatch folderTimer = new Stopwatch();
             folderTimer.Start();
@@ -356,13 +363,13 @@ public class FolderArchiver
             // Update UI if prompt is true
             if (prompt)
             {
-                UpdateStatusLabel($"Archiving ({i + 1}/{totalFolders}): {folders[i]}");
                 //Check the source folder size
                 if (IsFolderBigUI(folders[i]))
                 {
                     continue;
                 }
             }
+            UpdateStatusLabel($"Archiving ({i + 1}/{totalFolders}): {folders[i]}");
 
             var folder = folders[i];
             var files = fileLists[i]; // List of FileInfoItem
@@ -646,16 +653,10 @@ public class FolderArchiver
         return totalSize;
     }
 
+    // Update the status label on the UI
     private void UpdateStatusLabel(string message)
     {
-        if (statusLabel.InvokeRequired)
-        {
-            statusLabel.Invoke(new Action(() => statusLabel.Text = message));
-        }
-        else
-        {
-            statusLabel.Text = message;
-        }
+        updateStatusAction?.Invoke(message);    // Invoke the action to update the status label
     }
 
     private void ClearLogFile()

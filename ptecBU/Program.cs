@@ -297,6 +297,10 @@ static class Program
 
     public static void OnBackupNow(object sender, EventArgs e)
     {
+        OnBackupNow(sender, e, false); // Calls the modified version with a default for the new parameter
+    }
+    public static void OnBackupNow(object sender, EventArgs e, bool updateUI = false)
+    {
         Debug.WriteLine("Backup now clicked");
 
         // Start the backup process on a separate thread
@@ -308,7 +312,7 @@ static class Program
                 try
                 {
                     // Perform backup using the ConfigurationManager destination
-                    await BackupManager.PerformBackup();
+                    await BackupManager.PerformBackup(false,updateUI);
                 }
                 catch (Exception ex)
                 {

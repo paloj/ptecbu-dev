@@ -23,7 +23,6 @@ class SettingsForm : Form
     private CheckBox globalSkipCompareCheckBox;
     private Label globalMaxZipRetentionUpDownLabel;
     private NumericUpDown globalMaxZipRetentionUpDown;
-    public Label ArchiveStatusLabel;
     private LinkLabel openConfigFileLinkLabel;
     private Button RunBackupButton;
     private Button ArchiveFoldersButton;
@@ -73,6 +72,13 @@ class SettingsForm : Form
         // Set the form's icon
         this.Icon = new Icon("Resources/white.ico");
 
+        // create the status strip
+        statusStrip = new StatusStrip();
+        statusLabel = new ToolStripStatusLabel();
+        statusStrip.Items.Add(statusLabel);
+        statusLabel.Text = "Ready";
+        Controls.Add(statusStrip);
+
         // Create the label
         var foldersLabel = new Label()
         {
@@ -100,6 +106,10 @@ class SettingsForm : Form
             if (newIndex >= 0 && newIndex < foldersListBox.Items.Count)
             {
                 foldersListBox.SelectedIndex = newIndex;
+                // Update the tooltip text with the full path of the current item
+                fullPathToolTip.SetToolTip(foldersListBox, foldersListBox.Items[newIndex].ToString());
+                // Update status label with the full path of the current item
+                UpdateStatusLabelSafe(foldersListBox.Items[newIndex].ToString());
             }
         };
 
@@ -260,7 +270,7 @@ class SettingsForm : Form
         RunBackupButton.Click += (s, e) =>
         {
             // Run the backup process asynchronously
-            Task.Run(() => Program.OnBackupNow(s, e));
+            Task.Run(() => Program.OnBackupNow(s, e, true));
         };
         Controls.Add(RunBackupButton);
 
@@ -276,15 +286,6 @@ class SettingsForm : Form
 
         ArchiveFoldersButton.Click += ArchiveFoldersButton_Click;
         Controls.Add(ArchiveFoldersButton);
-
-        // Create the label for the Archiving status
-        ArchiveStatusLabel = new Label()
-        {
-            Location = new Point(235, 345), // Adjust these values to place the label appropriately
-            AutoSize = true,
-            Text = "sample text for placing the element"   // Empty placeholder for archiving status
-        };
-        Controls.Add(ArchiveStatusLabel);
 
         // Create the label for the last successful backup
         lastBackupLabel = new Label()
@@ -485,15 +486,6 @@ class SettingsForm : Form
         closeButton.Click += OnClose;
         Controls.Add(closeButton);
 
-        // create the status strip
-        statusStrip = new StatusStrip();
-        statusLabel = new ToolStripStatusLabel();
-        statusStrip.Items.Add(statusLabel);
-        statusLabel.Text = "Ready";
-        Controls.Add(statusStrip);
-        // Set the status stript text to current status
-        statusStripUpdate("Ready", true);
-
         // Populate the foldersListBox from a file
         if (File.Exists("folders.txt"))
         {
@@ -519,6 +511,9 @@ class SettingsForm : Form
                 }
             }
         }
+
+        // Set the status stript text to current status
+        statusStripUpdate("Ready", true);
     }
 
     private void foldersListBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -627,6 +622,8 @@ class SettingsForm : Form
         {
             // Update the tooltip text with the full path of the current item
             fullPathToolTip.SetToolTip(foldersListBox, foldersListBox.Items[index].ToString());
+            // Update status label with the full path of the current item
+            statusLabel.Text = foldersListBox.Items[index].ToString();
             previousIndex = index; // Update the last shown tooltip index
         }
         else if (index == -1) // Mouse is not over any item
@@ -695,10 +692,13 @@ class SettingsForm : Form
             foldersListBox.Items.Add(selectedPath);
             //update folders.txt file
             WriteListBoxContentsToFile(foldersListBox, "folders.txt");
+            // Update statuslabel
+            statusLabel.Text = $"Folder {selectedPath} added to backup list.";
         }
     }
     private void OnRemoveFolder(object sender, EventArgs e)
     {
+        string folderPath = foldersListBox.SelectedItem.ToString();
         // Handle remove folder clicked
         if (foldersListBox.SelectedItem != null)
         {
@@ -713,6 +713,8 @@ class SettingsForm : Form
 
         //update folders.txt file
         WriteListBoxContentsToFile(foldersListBox, "folders.txt");
+        // Update statuslabel
+        statusLabel.Text = $"Folder {folderPath} removed from backup list.";
     }
 
     private void OnAddExcludedItem(object sender, EventArgs e)
@@ -727,6 +729,8 @@ class SettingsForm : Form
         }
         // update excludedItems.txt file
         WriteListBoxContentsToFile(excludedItemsListBox, "excludedItems.txt");
+        // Update statuslabel
+        statusLabel.Text = $"Item {item} added to excluded list.";
     }
 
     private void OnRemoveExcludedItem(object sender, EventArgs e)
@@ -739,6 +743,8 @@ class SettingsForm : Form
         }
         // update excludedItems.txt file
         WriteListBoxContentsToFile(excludedItemsListBox, "excludedItems.txt");
+        // Update statuslabel
+        statusLabel.Text = $"Item removed from excluded list.";
     }
 
     private void OpenConfigFileLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -865,22 +871,6 @@ class SettingsForm : Form
         }
     }
 
-    private static async Task WriteListBoxContentsToFileAsync(ListBox listBox, string filePath)
-    {
-        using StreamWriter writer = new(filePath);
-        foreach (var item in listBox.Items)
-        {
-            if (item != null)
-            {
-                string line = item.ToString();
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    await writer.WriteLineAsync(line);  // Use WriteLineAsync for asynchronous file writing
-                }
-            }
-        }
-    }
-
     private void statusStripUpdate(string text, bool checkSettings = false)
     {
         if (checkSettings)
@@ -968,32 +958,66 @@ class SettingsForm : Form
     // Archive all folders to zip files button
     private void ArchiveFoldersButton_Click(object sender, EventArgs e)
     {
-        var archiver = new FolderArchiver(ArchiveStatusLabel);
+        // Update the status label
+        statusLabel.Text = "Creating zip backups for all folders. This may take a while...";
+
+        // Create a new FolderArchiver instance and run the ArchiveFolders method asynchronously
+        var archiver = new FolderArchiver(UpdateStatusLabelSafe);
         Task.Run(() => archiver.ArchiveFolders());
+    }
+
+    private void UpdateStatusLabelSafe(string message)
+    {
+        if (this.statusStrip.InvokeRequired)
+        {
+            this.statusStrip.Invoke(new Action(() => UpdateStatusLabel(message)));
+        }
+        else
+        {
+            UpdateStatusLabel(message);
+        }
+    }
+
+    private void UpdateStatusLabel(string message)
+    {
+        // Ensure the status label is not null before updating
+        if (statusLabel != null)
+        {
+            statusLabel.Text = message;
+        }
     }
 
     // Update registry if the autostart checkbox status changes
     private void LaunchOnStartupCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         UpdateRegistryForStartup();
+        // Update status label
+        string text = launchOnStartupCheckBox.Checked ? "Application will start on Windows startup." : "Application will not start on Windows startup.";
+        UpdateStatusLabelSafe(text);
     }
 
     private void IncludeZipInBackupCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         // Update config.ini with the new value
         ConfigurationManager.UpdateIniFile("includeZipInBackup", includeZipInBackupCheckBox.Checked ? "true" : "false");
+        // Update status label
+        statusLabel.Text = includeZipInBackupCheckBox.Checked ? "Zip files will be included in the backup." : "Zip files will not be included in the backup.";
     }
 
     private void OnlyMakeZipBackupCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         // Update config.ini with the new value
         ConfigurationManager.UpdateIniFile("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
+        // Update status label
+        statusLabel.Text = onlyMakeZipBackupCheckBox.Checked ? "Only zip backups will be created." : "Normal backups will be created.";
     }
 
     private void GlobalSkipCompareCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         // Update config.ini with the new value
         ConfigurationManager.UpdateIniFile("skipZipfileComparison", globalSkipCompareCheckBox.Checked ? "true" : "false");
+        // Update status label
+        statusLabel.Text = globalSkipCompareCheckBox.Checked ? "File comparison will be skipped when making zip backups." : "File comparison will be performed when making zip backups.";
     }
 
     private void CheckUpdatesButton_Click(object sender, EventArgs e)

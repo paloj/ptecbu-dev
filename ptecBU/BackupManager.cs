@@ -15,7 +15,7 @@ public class BackupManager
     private static Icon YellowIcon;
     private static Icon RedIcon;
 
-    public static async Task PerformBackup(bool exitAfter = false)
+    public static async Task PerformBackup(bool exitAfter = false, bool updateUI = false)
     {
         // Initialize the stopwatch at the start of the backup process
         Stopwatch backupTimer = new Stopwatch();
@@ -57,11 +57,11 @@ public class BackupManager
         // If onlyMakeZipBackup is true, perform only the zip backup and skip robocopy
         if (ConfigurationManager.Config.TryGetValue("onlyMakeZipBackup", out var value) && bool.TryParse(value, out onlyMakeZipBackupGlobal) && onlyMakeZipBackupGlobal)
         {
-            var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
+            var archiver = new FolderArchiver(null); // Assuming FolderArchiver is accessible and implemented
             try
             {
                 // Run the zip archive process in a separate thread and await its completion
-                await Task.Run(() => archiver.ArchiveFolders(false));
+                await Task.Run(() => archiver.ArchiveFolders(updateUI));
             }
             catch (Exception ex)
             {
@@ -371,10 +371,10 @@ public class BackupManager
             if (bool.TryParse(globalConfig.GetValueOrDefault("includeZipInBackup", "false"), out includeZipInBackupGlobal) && includeZipInBackupGlobal && !onlyMakeZipBackupGlobal)
             {
                 // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
-                var archiver = new FolderArchiver();                    // Create a new instance of the FolderArchiver class
+                var archiver = new FolderArchiver(null);                    // Create a new instance of the FolderArchiver class
                 try
                 {
-                    await Task.Run(() => archiver.ArchiveFolders(false));   // Run the archiver in a separate thread
+                    await Task.Run(() => archiver.ArchiveFolders(updateUI));   // Run the archiver in a separate thread
                 }
                 catch (Exception ex)
                 {
@@ -551,14 +551,14 @@ public class BackupManager
             return true; // Assume backup is needed if parsing fails
         }
 
-        Debug.WriteLine($"Last backup: {lastBackup}");
-        Debug.WriteLine($"Current time: {DateTime.Now}");
-        Debug.WriteLine($"Difference: {DateTime.Now - lastBackup}");
+        //Debug.WriteLine($"Last backup: {lastBackup}");
+        //Debug.WriteLine($"Current time: {DateTime.Now}");
+        //Debug.WriteLine($"Difference: {DateTime.Now - lastBackup}");
 
         // Safely retrieve and parse the backup interval hours from the configuration
         if (ConfigurationManager.Config.TryGetValue("hoursbetweenbackups", out string hoursStr) && int.TryParse(hoursStr, out int hours))
         {
-            Debug.WriteLine($"Config hours: {hours}");
+            //Debug.WriteLine($"Config hours: {hours}");
             return DateTime.Now - lastBackup > TimeSpan.FromHours(hours);
         }
         else
