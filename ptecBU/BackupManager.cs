@@ -6,20 +6,36 @@ using System.Text.RegularExpressions;
 
 public class BackupManager
 {
+    public static event Action<string> StatusUpdated;
     static string hostname = Environment.MachineName;
     public static string backupDestination = Path.Combine(ConfigurationManager.Config["destination"], hostname);
     public static bool IsBlinking { get; private set; }
     private static CancellationTokenSource BlinkCancellationTokenSource;
+    private static TimeSpan robocopyDuration;
+    private static TimeSpan zipDuration;
     private static Task BlinkTask;
     private static Icon GreenIcon;
     private static Icon YellowIcon;
     private static Icon RedIcon;
+
+    private static void UpdateStatus(string message)
+    {
+        StatusUpdated?.Invoke(message);
+    }
 
     public static async Task PerformBackup(bool exitAfter = false, bool updateUI = false)
     {
         // Initialize the stopwatch at the start of the backup process
         Stopwatch backupTimer = new Stopwatch();
         backupTimer.Start();
+        Program.IsBackupInProgress = true;
+        robocopyDuration = TimeSpan.Zero;
+        zipDuration = TimeSpan.Zero;
+
+        if (updateUI)
+        {
+            UpdateStatus("Backup in progress...");
+        }
 
         // Set the destination path for the backup
         backupDestination = Path.Combine(ConfigurationManager.Config["destination"], hostname);
@@ -27,10 +43,7 @@ public class BackupManager
         // Ensure the log file is clear or create it if not existing
         string logFilePath = "log/backupDuration.log";
         File.WriteAllText(logFilePath, "");  // Clears the existing log or creates a new one
-        TimeSpan robocopyDuration = TimeSpan.Zero;
 
-        // Start blinking tray icon to indicate backup is in progress
-        Program.IsBackupInProgress = true;
         // Start blinking the tray icon to indicate the backup process has started
         Debug.WriteLine("Blinking tray icon to indicate backup process has started.");
         GreenIcon = new Icon("Resources/green.ico");
@@ -57,7 +70,7 @@ public class BackupManager
         // If onlyMakeZipBackup is true, perform only the zip backup and skip robocopy
         if (ConfigurationManager.Config.TryGetValue("onlyMakeZipBackup", out var value) && bool.TryParse(value, out onlyMakeZipBackupGlobal) && onlyMakeZipBackupGlobal)
         {
-            var archiver = new FolderArchiver(null); // Assuming FolderArchiver is accessible and implemented
+            var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
             try
             {
                 // Run the zip archive process in a separate thread and await its completion
@@ -213,6 +226,11 @@ public class BackupManager
                 // Normalize the folder path
                 string folder = folders[i].TrimEnd('\\');
 
+                if (updateUI)
+                {
+                    UpdateStatus("Backing up " + folder);
+                }
+
                 // Determine if the source is a drive root
                 bool isDriveRoot = Path.GetPathRoot(folder).Equals(folder, StringComparison.OrdinalIgnoreCase);
 
@@ -250,6 +268,24 @@ public class BackupManager
                     {
                         Program.RobocopyProcess.Kill();
                         Program.RobocopyProcess.Dispose();
+                    }
+
+                    // Program.IsBackupInProgress is checked if the backup process is cancelled by the user
+                    if (!Program.IsBackupInProgress)
+                    {
+                        // Stop blinking the tray icon to indicate the backup process has completed
+                        try
+                        {
+                            Debug.WriteLine("Stop blinking tray icon to indicate backup process has completed.");
+                            await BlinkTrayIconAsync(false);
+                            // End the backup process early if it was cancelled
+                            return;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
+                        }
+                        return;
                     }
 
                     // Run robocopy
@@ -371,7 +407,7 @@ public class BackupManager
             if (bool.TryParse(globalConfig.GetValueOrDefault("includeZipInBackup", "false"), out includeZipInBackupGlobal) && includeZipInBackupGlobal && !onlyMakeZipBackupGlobal)
             {
                 // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
-                var archiver = new FolderArchiver(null);                    // Create a new instance of the FolderArchiver class
+                var archiver = new FolderArchiver();                    // Create a new instance of the FolderArchiver class
                 try
                 {
                     await Task.Run(() => archiver.ArchiveFolders(updateUI));   // Run the archiver in a separate thread
@@ -395,7 +431,7 @@ public class BackupManager
                     Program.IsBackupInProgress = false;
 
                     // Write the full backup duration to the log file
-                    TimeSpan zipDuration = backupTimer.Elapsed - robocopyDuration;
+                    zipDuration = backupTimer.Elapsed - robocopyDuration;
                     File.AppendAllText(logFilePath, $"{DateTime.Now:O} ZIP archiving duration: {zipDuration}\n");
 
                     // Conclude the backup process
@@ -403,6 +439,29 @@ public class BackupManager
                     TimeSpan totalBackupDuration = backupTimer.Elapsed;
                     File.AppendAllText(logFilePath, $"{DateTime.Now:O} Full backup duration: {totalBackupDuration}\n");
                 }
+            }
+        }
+
+        if (updateUI)
+        {
+            // Initialize a timeout or a maximum number of retries
+            int maxRetries = 50; // equivalent to 5 seconds if each delay is 100 ms
+            int retryCount = 0;
+
+            // Wait for the blinking task to complete before updating the status
+            while (IsBlinking && retryCount < maxRetries)
+            {
+                await Task.Delay(100);
+                retryCount++;
+            }
+
+            if (retryCount >= maxRetries)
+            {
+                UpdateStatus("Timeout waiting for blinking to stop.");
+            }
+            else
+            {
+                UpdateStatus($"Backup completed in {backupTimer.Elapsed.ToString(@"hh\:mm\:ss")} (Robocopy: {robocopyDuration.ToString(@"hh\:mm\:ss")}, Zip: {zipDuration.ToString(@"hh\:mm\:ss")})");
             }
         }
 

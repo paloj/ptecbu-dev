@@ -15,14 +15,18 @@ public class FileInfoItem
 
 public class FolderArchiver
 {
-    private Action<string> updateStatusAction;
+    public static event Action<string> StatusUpdated;
     private string destinationPath;
     private const string ExcludedItemsPath = "excludedItems.txt";
 
-    public FolderArchiver(Action<string> updateStatusAction)
+    public FolderArchiver()
     {
-        this.updateStatusAction = updateStatusAction;
         ReadConfig();
+    }
+
+    private static void UpdateStatusLabel(string message)
+    {
+        StatusUpdated?.Invoke(message);
     }
 
     public List<string> LoadExcludedItems()
@@ -49,6 +53,12 @@ public class FolderArchiver
                 var files = Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories);
                 foreach (var file in files)
                 {
+                    // Check if user has cancelled the backup
+                    if (!Program.IsBackupInProgress)
+                    {
+                        UpdateStatusLabel("Backup Cancelled");
+                        return;
+                    }
                     if (!IsExcluded(file, excludedPatterns))
                     {
                         filesList.Add(file);
@@ -70,6 +80,13 @@ public class FolderArchiver
         // Normalize path to use backslashes
         string normalizedPath = filePath.Replace('/', '\\');
         Debug.WriteLine($"Evaluating exclusion for: {normalizedPath}");
+
+        // Check if the backup has been cancelled by the user
+        if (!Program.IsBackupInProgress)
+        {
+            Debug.WriteLine("Backup cancelled by user.");
+            return true;
+        }
 
         foreach (var pattern in excludedItems)
         {
@@ -191,6 +208,13 @@ public class FolderArchiver
             // Start async archiving process for each folder. First asynchronously create a list of files for each folder that are not excluded using FileInfoItem class
             var tasks = folders.Select(async folder =>
             {
+                // Check Program.IsBackupInProgress to cancel the archiving process
+                if (!Program.IsBackupInProgress)
+                {
+                    UpdateStatusLabel("Archiving Cancelled");
+                    return new List<FileInfoItem>(); // Skip processing this folder
+                }
+
                 try
                 {
                     Debug.WriteLine($"Processing folder: {folder}");
@@ -241,6 +265,13 @@ public class FolderArchiver
             List<string> filteredFolders = new List<string>();
             List<List<FileInfoItem>> filteredResults = new List<List<FileInfoItem>>();
 
+            // Check if Program.IsBackupInProgress is false to cancel the archiving process
+            if (!Program.IsBackupInProgress)
+            {
+                UpdateStatusLabel("Archiving Cancelled");
+                return;
+            }
+
             for (int i = 0; i < results.Length; i++)
             {
                 if (results[i].Count > 0)
@@ -276,6 +307,17 @@ public class FolderArchiver
                     if (prompt)
                     {
                         UpdateStatusLabel("Comparing files for: " + folder);
+                    }
+
+                    // Program.IsBackupInProgress is checked to cancel the archiving process
+                    if (!Program.IsBackupInProgress)
+                    {
+                        UpdateStatusLabel("Archiving Cancelled");
+                        return new ArchiveStatus
+                        {
+                            NeedsArchive = false,
+                            Message = "Archiving Cancelled"
+                        };
                     }
 
                     bool needsArchive = await ShouldCreateNewArchiveAsync(folder, files, folderConfig, globalConfig);
@@ -315,6 +357,13 @@ public class FolderArchiver
 
             await AsyncFileLogger.LogAsync($"Filelists created in {stopwatch.Elapsed.TotalSeconds} seconds.");
 
+            // Check if Program.IsBackupInProgress is false to cancel the archiving process
+            if (!Program.IsBackupInProgress)
+            {
+                UpdateStatusLabel("Archiving Cancelled");
+                return;
+            }
+
             // Now start synchronous archiving of the folders that need a new archive based on the results
             WriteArchivesSync([.. folders], [.. results], [.. archiveResults], globalConfig, destinationPath, prompt);
 
@@ -324,7 +373,8 @@ public class FolderArchiver
             // Update the UI status label if prompt is true
             if (prompt)
             {
-                UpdateStatusLabel("Archiving Complete");
+                TimeSpan elapsed = TimeSpan.FromSeconds(Math.Ceiling(stopwatch.Elapsed.TotalSeconds));
+                UpdateStatusLabel($"Archiving completed in {elapsed}.");
             }
         }
         catch (Exception ex)
@@ -361,6 +411,7 @@ public class FolderArchiver
             if (!archiveStatuses[i].NeedsArchive) continue;  // Use the updated data structure
 
             // Update UI if prompt is true
+            /*
             if (prompt)
             {
                 //Check the source folder size
@@ -369,6 +420,7 @@ public class FolderArchiver
                     continue;
                 }
             }
+            */
             UpdateStatusLabel($"Archiving ({i + 1}/{totalFolders}): {folders[i]}");
 
             var folder = folders[i];
@@ -432,17 +484,60 @@ public class FolderArchiver
         Debug.WriteLine($"Creating ZIP archive at: {zipFilePath}");
         try
         {
+            // Create a timer to control status updates
+            Stopwatch timer = new Stopwatch();
+            timer.Start();
+
             using (var zip = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
             {
                 foreach (var file in files)
                 {
+                    // Check Program.IsBackupInProgress to cancel the archiving process
+                    if (!Program.IsBackupInProgress)
+                    {
+                        UpdateStatusLabel("Archiving Cancelled");
+                        zip.Dispose(); // Ensure to clean up resources properly
+                        return;
+                    }
+
                     if (!file.IsExcluded)
                     {
                         // Ensure the relative path is calculated correctly
                         string relativePath = Path.GetRelativePath(folder, file.FilePath);
                         string entryName = Path.Combine(Path.GetFileName(folder), relativePath);
-                        Debug.WriteLine($"Adding file: {entryName} to ZIP");
-                        zip.CreateEntryFromFile(file.FilePath, entryName, CompressionLevel.Optimal);
+
+                        // Decide the compression level based on file size
+                        CompressionLevel level;
+                        string message;
+                        FileInfo fileInfo = new(file.FilePath);
+                        // Read the filename
+                        string filename = Path.GetFileName(file.FilePath);
+
+                        if (fileInfo.Length > 500 * 1024 * 1024)
+                        {
+                            level = CompressionLevel.NoCompression;
+                            message = $"{folder}: Adding large files to ZIP with no compression: {filename}";
+                        }
+                        else if (fileInfo.Length > 50 * 1024 * 1024)
+                        {
+                            level = CompressionLevel.Fastest;
+                            message = $"{folder}: Adding files to ZIP with fastest compression: {filename}";
+                        }
+                        else
+                        {
+                            level = CompressionLevel.Optimal;
+                            message = $"{folder}: Adding files to ZIP with optimal compression: {filename}";
+                        }
+
+                        // Add file to zip with determined compression level
+                        zip.CreateEntryFromFile(file.FilePath, entryName, level);
+
+                        // Update status if more than 0.25 seconds have passed
+                        if (timer.Elapsed.TotalSeconds > 0.25)
+                        {
+                            UpdateStatusLabel(message);
+                            timer.Restart();
+                        }
                     }
                 }
             }
@@ -651,12 +746,6 @@ public class FolderArchiver
             totalSize += fileInfo.Length;
         }
         return totalSize;
-    }
-
-    // Update the status label on the UI
-    private void UpdateStatusLabel(string message)
-    {
-        updateStatusAction?.Invoke(message);    // Invoke the action to update the status label
     }
 
     private void ClearLogFile()

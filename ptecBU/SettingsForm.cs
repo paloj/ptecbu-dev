@@ -78,6 +78,10 @@ class SettingsForm : Form
         statusStrip.Items.Add(statusLabel);
         statusLabel.Text = "Ready";
         Controls.Add(statusStrip);
+        // Subscribe to the BackupManager's StatusUpdated event to update the status label
+        BackupManager.StatusUpdated += UpdateStatusLabelSafe;
+        FolderArchiver.StatusUpdated += UpdateStatusLabelSafe;
+        this.FormClosing += FormClosing_Event;  // Subscribe to the FormClosing event to unsubscribe from the BackupManager's StatusUpdated event
 
         // Create the label
         var foldersLabel = new Label()
@@ -956,15 +960,28 @@ class SettingsForm : Form
     }
 
     // Archive all folders to zip files button
-    private void ArchiveFoldersButton_Click(object sender, EventArgs e)
+    private async void ArchiveFoldersButton_Click(object sender, EventArgs e)
     {
-        // Update the status label
+        Program.IsBackupInProgress = true;
         statusLabel.Text = "Creating zip backups for all folders. This may take a while...";
 
-        // Create a new FolderArchiver instance and run the ArchiveFolders method asynchronously
-        var archiver = new FolderArchiver(UpdateStatusLabelSafe);
-        Task.Run(() => archiver.ArchiveFolders());
+        try
+        {
+            var archiver = new FolderArchiver();
+            Program.UpdateTrayMenuItem();
+            await Task.Run(() => archiver.ArchiveFolders());
+            statusLabel.Text = "Archiving complete.";
+        }
+        catch (Exception ex)
+        {
+            statusLabel.Text = "Error during archiving: " + ex.Message;
+        }
+        finally
+        {
+            Program.IsBackupInProgress = false;
+        }
     }
+
 
     private void UpdateStatusLabelSafe(string message)
     {
@@ -1053,6 +1070,12 @@ class SettingsForm : Form
         {
             MessageBox.Show("The path does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private void FormClosing_Event(object sender, FormClosingEventArgs e)
+    {
+        // Unsubscribe to prevent memory leaks
+        BackupManager.StatusUpdated -= UpdateStatusLabelSafe;
     }
 }
 

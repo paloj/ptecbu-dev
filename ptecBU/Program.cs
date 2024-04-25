@@ -370,6 +370,8 @@ static class Program
         }
 
         UpdateTrayMenuItem();
+        // Restart the application to ensure proper cleanup
+        //Application.Restart();
     }
 
     public static void UpdateTrayMenuItem()
