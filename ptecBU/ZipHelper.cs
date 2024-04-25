@@ -226,10 +226,12 @@ public class FolderArchiver
                     FolderConfig folderConfig = folderConfigs.ContainsKey(folder) ? folderConfigs[folder] : new FolderConfig { BackupOption = BackupOptions.UseGlobalSetting };
                     string includeZipInBackup = globalConfig.TryGetValue("includeZipInBackup", out includeZipInBackup) ? includeZipInBackup : "true";
 
-                    if (folderConfig.BackupOption == BackupOptions.UseGlobalSetting && !bool.Parse(includeZipInBackup))
+                    // Skip archive creation based on global settings or individual folder settings
+                    if ((folderConfig.BackupOption == BackupOptions.OnlyMakeNormalBackup) || 
+                        (folderConfig.BackupOption == BackupOptions.UseGlobalSetting && !bool.Parse(includeZipInBackup)))
                     {
-                        Debug.WriteLine("Zipfile creation skipped due to global setting.");
-                        await AsyncFileLogger.LogAsync($"Zipfile creation skipped for {folder} due to global setting.");
+                        Debug.WriteLine($"Zipfile creation skipped for {folder} due to setting.");
+                        await AsyncFileLogger.LogAsync($"Zipfile creation skipped for {folder} due to setting.");
                         return new List<FileInfoItem>(); // Skip processing this folder
                     }
 

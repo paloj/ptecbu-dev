@@ -217,7 +217,8 @@ class SettingsForm : Form
         backupOptionComboBox.Items.AddRange(new object[] {
         "Use global setting",
         "Only make zip backup",
-        "Include zip in normal backup"
+        "Include zip in normal backup",
+        "Only make normal backup"
         });
 
         maxZipRetentionLabel = new Label
@@ -1123,5 +1124,6 @@ public enum BackupOptions
 {
     UseGlobalSetting,
     OnlyMakeZipBackup,
-    IncludeZipInNormalBackup
+    IncludeZipInNormalBackup,
+    OnlyMakeNormalBackup
 }
