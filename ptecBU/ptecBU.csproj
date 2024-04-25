@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <ApplicationIcon>Resources\white.ico</ApplicationIcon>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <Version>1.0.0.24</Version>
+    <Version>1.0.0.25</Version>
     <Nullable>disable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -73,8 +73,8 @@ public class BackupManager
             var archiver = new FolderArchiver(); // Assuming FolderArchiver is accessible and implemented
             try
             {
-                // Run the zip archive process in a separate thread and await its completion
-                await Task.Run(() => archiver.ArchiveFolders(updateUI));
+                // Run the zip archive process and await its completion
+                await archiver.ArchiveFolders(updateUI);
             }
             catch (Exception ex)
             {
@@ -323,8 +323,7 @@ public class BackupManager
                         {
                             Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
                         }
-                        Program.IsBackupInProgress = false;
-
+                        
                         if (exitAfter)
                         {
                             Application.Exit();
@@ -400,17 +399,17 @@ public class BackupManager
             }
 
             robocopyDuration = backupTimer.Elapsed;
-            File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy total duration: {robocopyDuration}\n");
-
-            // Add zip to backup if enabled in config.ini and not set to only make zip backups
-            bool includeZipInBackupGlobal = false; // Default to false if not specified or invalid
-            if (bool.TryParse(globalConfig.GetValueOrDefault("includeZipInBackup", "false"), out includeZipInBackupGlobal) && includeZipInBackupGlobal && !onlyMakeZipBackupGlobal)
+            File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy total duration: {robocopyDuration}\n");            
+            
+            // Check if onlyMakeZipBackupGlobal was set to true. Skip the zip archiving process if true since it was already done.
+            if (!onlyMakeZipBackupGlobal)
             {
                 // Run the archiver in a separate thread. The FolderArchiver class is in ZipHelper.cs
                 var archiver = new FolderArchiver();                    // Create a new instance of the FolderArchiver class
                 try
                 {
-                    await Task.Run(() => archiver.ArchiveFolders(updateUI));   // Run the archiver in a separate thread
+                    await archiver.ArchiveFolders(updateUI);   // Run the zip archiver
+
                 }
                 catch (Exception ex)
                 {
@@ -428,8 +427,7 @@ public class BackupManager
                     {
                         Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
                     }
-                    Program.IsBackupInProgress = false;
-
+                    
                     // Write the full backup duration to the log file
                     zipDuration = backupTimer.Elapsed - robocopyDuration;
                     File.AppendAllText(logFilePath, $"{DateTime.Now:O} ZIP archiving duration: {zipDuration}\n");
@@ -438,6 +436,19 @@ public class BackupManager
                     backupTimer.Stop();
                     TimeSpan totalBackupDuration = backupTimer.Elapsed;
                     File.AppendAllText(logFilePath, $"{DateTime.Now:O} Full backup duration: {totalBackupDuration}\n");
+                }
+            }
+            else
+            {
+                // Stop blinking the tray icon to indicate the backup process has completed
+                try
+                {
+                    Debug.WriteLine("Stop blinking tray icon to indicate backup process has completed.");
+                    await BlinkTrayIconAsync(false);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
                 }
             }
         }
@@ -464,6 +475,8 @@ public class BackupManager
                 UpdateStatus($"Backup completed in {backupTimer.Elapsed.ToString(@"hh\:mm\:ss")} (Robocopy: {robocopyDuration.ToString(@"hh\:mm\:ss")}, Zip: {zipDuration.ToString(@"hh\:mm\:ss")})");
             }
         }
+
+        Program.IsBackupInProgress = false;
 
         if (exitAfter)
         {
