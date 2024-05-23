@@ -80,6 +80,31 @@ public class BackupManager
             {
                 Debug.WriteLine($"Error archiving folders: {ex.Message}");
             }
+            finally
+            {
+                // Stop blinking the tray icon to indicate the backup process has completed
+                try
+                {
+                    Debug.WriteLine("Stop blinking tray icon to indicate backup process has completed.");
+                    await BlinkTrayIconAsync(false);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
+                }
+
+                // Write current timestamp to file
+                File.WriteAllText("log/lastBackup.log", DateTime.Now.ToString("o"));
+
+                // Write the full backup duration to the log file
+                zipDuration = backupTimer.Elapsed - robocopyDuration;
+                File.AppendAllText(logFilePath, $"{DateTime.Now:O} ZIP archiving duration: {zipDuration}\n");
+
+                // Conclude the backup process
+                backupTimer.Stop();
+                TimeSpan totalBackupDuration = backupTimer.Elapsed;
+                File.AppendAllText(logFilePath, $"{DateTime.Now:O} Full backup duration: {totalBackupDuration}\n");
+            }
         }
         else
         {
@@ -323,7 +348,7 @@ public class BackupManager
                         {
                             Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
                         }
-                        
+
                         if (exitAfter)
                         {
                             Application.Exit();
@@ -399,8 +424,8 @@ public class BackupManager
             }
 
             robocopyDuration = backupTimer.Elapsed;
-            File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy total duration: {robocopyDuration}\n");            
-            
+            File.AppendAllText(logFilePath, $"{DateTime.Now:O} Robocopy total duration: {robocopyDuration}\n");
+
             // Check if onlyMakeZipBackupGlobal was set to true. Skip the zip archiving process if true since it was already done.
             if (!onlyMakeZipBackupGlobal)
             {
@@ -427,7 +452,7 @@ public class BackupManager
                     {
                         Debug.WriteLine($"Error blinking tray icon: {ex.Message}");
                     }
-                    
+
                     // Write the full backup duration to the log file
                     zipDuration = backupTimer.Elapsed - robocopyDuration;
                     File.AppendAllText(logFilePath, $"{DateTime.Now:O} ZIP archiving duration: {zipDuration}\n");
@@ -478,6 +503,10 @@ public class BackupManager
 
         Program.IsBackupInProgress = false;
 
+        // Wait for 200ms second before calling Program.UpdateTrayIconTooltip()
+        await Task.Delay(200);
+        Program.UpdateTrayIconTooltip();
+
         if (exitAfter)
         {
             Application.Exit();
@@ -521,6 +550,7 @@ public class BackupManager
                         {
                             // Swap between Green and Yellow icons
                             Program.trayIcon.Icon = Program.trayIcon.Icon == GreenIcon ? YellowIcon : GreenIcon;
+                            // Wait for the blink duration or until cancellation is requested. handle task cancellation
                             await Task.Delay(blinkDuration, BlinkCancellationTokenSource.Token);
                         }
                     }
@@ -561,7 +591,7 @@ public class BackupManager
                 }
                 finally
                 {
-                    Debug.WriteLine("Ignore above exception. (Exception thrown: 'System.Threading.Tasks.TaskCanceledException' in System.Private.CoreLib.dll) It is normal.");
+                    Debug.WriteLine("Ignore above exception. (Exception thrown: 'System.Threading.Tasks.TaskCanceledException' in System.Private.CoreLib.dll) It is expected.");
                     if (BlinkCancellationTokenSource != null)
                     {
                         BlinkCancellationTokenSource.Dispose();

@@ -224,11 +224,24 @@ public class FolderArchiver
                         UpdateStatusLabel("Applying exclusions for: " + folder);
                     }
                     FolderConfig folderConfig = folderConfigs.ContainsKey(folder) ? folderConfigs[folder] : new FolderConfig { BackupOption = BackupOptions.UseGlobalSetting };
-                    string includeZipInBackup = globalConfig.TryGetValue("includeZipInBackup", out includeZipInBackup) ? includeZipInBackup : "true";
+
+                    // Check if the folder should be included in the backup based on the global setting or individual folder setting
+                    globalConfig.TryGetValue("includeZipInBackup", out string includeZipInBackup);
+                    includeZipInBackup = string.IsNullOrEmpty(includeZipInBackup) ? "true" : includeZipInBackup;
+
+                    // Check the onlyMakeZipBackup setting in the global config
+                    bool globalOnlyMakeZipBackup = globalConfig.TryGetValue("onlyMakeZipBackup", out string onlyMakeZipBackup) && bool.Parse(onlyMakeZipBackup);
+
+                    // If globalOnlyMakeZipBackup is true, override the includeZipInBackup setting
+                    if (globalOnlyMakeZipBackup)
+                    {
+                        includeZipInBackup = "true";
+                    }
 
                     // Skip archive creation based on global settings or individual folder settings
-                    if ((folderConfig.BackupOption == BackupOptions.OnlyMakeNormalBackup) || 
-                        (folderConfig.BackupOption == BackupOptions.UseGlobalSetting && !bool.Parse(includeZipInBackup)))
+                    if (!globalOnlyMakeZipBackup &&
+                        (folderConfig.BackupOption == BackupOptions.OnlyMakeNormalBackup ||
+                         (folderConfig.BackupOption == BackupOptions.UseGlobalSetting && !bool.Parse(includeZipInBackup))))
                     {
                         Debug.WriteLine($"Zipfile creation skipped for {folder} due to setting.");
                         await AsyncFileLogger.LogAsync($"Zipfile creation skipped for {folder} due to setting.");
@@ -574,10 +587,19 @@ public class FolderArchiver
 
     public async Task<bool> ShouldCreateNewArchiveAsync(string folderPath, List<FileInfoItem> files, FolderConfig folderConfig, Dictionary<string, string> globalConfig)
     {
+        // Retrieve the global settings
+        bool globalOnlyMakeZipBackup = globalConfig.TryGetValue("onlyMakeZipBackup", out string onlyMakeZipBackup) && bool.Parse(onlyMakeZipBackup);
+        globalConfig.TryGetValue("includeZipInBackup", out string includeZipInBackup);
+        includeZipInBackup = string.IsNullOrEmpty(includeZipInBackup) ? "true" : includeZipInBackup;
+
+        // If globalOnlyMakeZipBackup is true, override the includeZipInBackup setting
+        if (globalOnlyMakeZipBackup)
+        {
+            includeZipInBackup = "true";
+        }
+
         // Skip archive creation based on global settings
-        if (folderConfig?.BackupOption == BackupOptions.UseGlobalSetting &&
-            globalConfig.TryGetValue("includeZipInBackup", out string includeZipInBackup) &&
-            !bool.Parse(includeZipInBackup))
+        if (folderConfig?.BackupOption == BackupOptions.UseGlobalSetting && !bool.Parse(includeZipInBackup))
         {
             Debug.WriteLine("Zipfile creation skipped due to global setting.");
             await AsyncFileLogger.LogAsync($"Zipfile creation skipped for {folderPath} due to global setting.");

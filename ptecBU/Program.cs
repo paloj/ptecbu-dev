@@ -320,7 +320,20 @@ static class Program
                 {
                     Debug.WriteLine(ex.Message);
                 }
-
+                // Check if invoke is required to update the UI from the backup task
+                if (trayIcon.ContextMenuStrip.InvokeRequired)
+                {
+                    IsBackupInProgress = false; // Mark backup as complete
+                    trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(UpdateTrayIconTooltip));
+                    trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(UpdateTrayMenuItem));
+                }
+                else
+                {
+                    IsBackupInProgress = false; // Mark backup as complete
+                    UpdateTrayIconTooltip();
+                    UpdateTrayMenuItem();
+                }
+                /*
                 // Update UI from the UI thread
                 trayIcon.ContextMenuStrip.Invoke(new MethodInvoker(() =>
                 {
@@ -328,6 +341,7 @@ static class Program
                     UpdateTrayIconTooltip();
                     UpdateTrayMenuItem(); // Ensure this updates the UI correctly after backup
                 }));
+                */
             });
         }
         catch (Exception ex)

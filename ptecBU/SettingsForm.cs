@@ -1,11 +1,13 @@
+#region Using directives
 using System.Windows.Forms;
 using System.Reflection;
 using System.Diagnostics;
 using System.Text.Json;
 using BlueMystic;
-
+#endregion
 class SettingsForm : Form
 {
+    #region Fields
     private DarkModeCS DM = null; //<- Line 1
     private ListBox foldersListBox;
     private Button addFolderButton;
@@ -15,8 +17,8 @@ class SettingsForm : Form
     private Button addExcludedItemButton;
     private Button removeExcludedItemButton;
     private CheckBox launchOnStartupCheckBox;
-    private CheckBox includeZipInBackupCheckBox;
-    private CheckBox onlyMakeZipBackupCheckBox;
+    private Label globalBackupOptionComboBoxLabel;
+    private ComboBox globalBackupOptionComboBox;
     private Button closeButton;
     private Label lastBackupLabel;
     private Label backupDestinationLabel;
@@ -50,7 +52,7 @@ class SettingsForm : Form
 
     // Controls for individual zip backup settings
     public Label individualSettingsLabel;
-    private ComboBox backupOptionComboBox;
+    private ComboBox individualBackupOptionComboBox;
     private Label maxZipRetentionLabel;
     private NumericUpDown maxZipRetentionUpDown;
     private CheckBox skipCompareCheckBox;
@@ -59,6 +61,8 @@ class SettingsForm : Form
 
     private int previousIndex = -1; // To track the item index that the tooltip was last shown for
 
+    #endregion
+    #region Constructor
     public SettingsForm()
     {
         DM = new DarkModeCS(this);
@@ -207,14 +211,14 @@ class SettingsForm : Form
         };
         Controls.Add(individualSettingsLabel);
 
-        backupOptionComboBox = new ComboBox
+        individualBackupOptionComboBox = new ComboBox
         {
             Location = new Point(10, 250),
             Width = 180,
             DropDownStyle = ComboBoxStyle.DropDownList,
             Visible = false,
         };
-        backupOptionComboBox.Items.AddRange(new object[] {
+        individualBackupOptionComboBox.Items.AddRange(new object[] {
         "Use global setting",
         "Only make zip backup",
         "Include zip in normal backup",
@@ -251,13 +255,13 @@ class SettingsForm : Form
         };
         LabelToolTip.SetToolTip(skipCompareCheckBox, "Skip file comparison inside previous zip file when making zip backup.(Creates new zip file every time)");
 
-        Controls.Add(backupOptionComboBox);
+        Controls.Add(individualBackupOptionComboBox);
         Controls.Add(maxZipRetentionLabel);
         Controls.Add(maxZipRetentionUpDown);
         Controls.Add(skipCompareCheckBox);
 
         // Add event handlers to handle changes in the UI and update folder settings
-        backupOptionComboBox.SelectedIndexChanged += (s, e) =>
+        individualBackupOptionComboBox.SelectedIndexChanged += (s, e) =>
         {
             SaveFolderSettings(foldersListBox.SelectedItem.ToString());
         };
@@ -366,8 +370,11 @@ class SettingsForm : Form
         {
             Location = new Point(350, 305), // Adjust these values to place the label appropriately
             Text = "Global Settings",
+            // Set the AutoSize property to true to automatically adjust the label's size based on its content
             AutoSize = true
         };
+        // Set the font style to bold and underline
+        globalSettingsLabel.Font = new Font(globalSettingsLabel.Font, FontStyle.Bold | FontStyle.Underline);
         Controls.Add(globalSettingsLabel);
 
         // Create the "Launch on Windows Startup" checkbox
@@ -401,38 +408,86 @@ class SettingsForm : Form
             }
         }
 
-        // CheckBox for including zip in backup
-        includeZipInBackupCheckBox = new CheckBox
+        // Create the global backup option label
+        globalBackupOptionComboBoxLabel = new Label()
         {
-            Location = new Point(350, 345), // Adjust as needed
-            Text = "Include Zip in Backup",
-            AutoSize = true
+            Text = "Backup options:",
+            AutoSize = true,
+            Location = new Point(347, 342) // Adjust these values to place the label appropriately
         };
-        includeZipInBackupCheckBox.CheckedChanged += IncludeZipInBackupCheckBox_CheckedChanged;
-        Controls.Add(includeZipInBackupCheckBox);
-        // Read the value from the config.ini file and set the checkbox accordingly
-        var config = ConfigurationManager.Config;
-        if (config.TryGetValue("includeZipInBackup", out string includeZipInBackupValue))
-        {
-            includeZipInBackupCheckBox.Checked = includeZipInBackupValue.ToLower() == "true";
-        }
-        LabelToolTip.SetToolTip(includeZipInBackupCheckBox, "Create a zip file of each folder to the backup folder when making a backup.");
+        Controls.Add(globalBackupOptionComboBoxLabel);
 
-        // CheckBox for only make zip backup
-        onlyMakeZipBackupCheckBox = new CheckBox
+        // Create the global backup option combo box
+        globalBackupOptionComboBox = new ComboBox()
         {
-            Location = new Point(350, 365), // Adjust as needed
-            Text = "Only Make Zip Backup",
-            AutoSize = true
+            Location = new Point(350, 360), // Adjust these values to place the combo box appropriately
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 200
         };
-        onlyMakeZipBackupCheckBox.CheckedChanged += OnlyMakeZipBackupCheckBox_CheckedChanged;
-        Controls.Add(onlyMakeZipBackupCheckBox);
-        // Read the value from the config.ini file and set the checkbox accordingly
-        if (config.TryGetValue("onlyMakeZipBackup", out string onlyMakeZipBackupValue))
+        globalBackupOptionComboBox.Items.AddRange(new object[] {
+        "Only make normal backup",
+        "Only make zip backup",
+        "Include zip in normal backup"
+        });
+        Controls.Add(globalBackupOptionComboBox);
+        // Read the value from the config.ini file and set the combo box accordingly
+        var config = ConfigurationManager.Config;
+        if (config.TryGetValue("includeZipInBackup", out string includeZipInBackupValue) && config.TryGetValue("onlyMakeZipBackup", out string onlyMakeZipBackupValue))
         {
-            onlyMakeZipBackupCheckBox.Checked = onlyMakeZipBackupValue.ToLower() == "true";
+            if (includeZipInBackupValue.Equals("true", StringComparison.CurrentCultureIgnoreCase) && onlyMakeZipBackupValue.Equals("true", StringComparison.CurrentCultureIgnoreCase))
+            {
+                globalBackupOptionComboBox.SelectedIndex = 1;
+            }
+            else if (onlyMakeZipBackupValue.Equals("true", StringComparison.CurrentCultureIgnoreCase))
+            {
+                globalBackupOptionComboBox.SelectedIndex = 1;
+            }
+            else if (includeZipInBackupValue.Equals("true", StringComparison.CurrentCultureIgnoreCase))
+            {
+                globalBackupOptionComboBox.SelectedIndex = 2;
+            }
+            else
+            {
+                globalBackupOptionComboBox.SelectedIndex = 0;
+            }
         }
-        LabelToolTip.SetToolTip(onlyMakeZipBackupCheckBox, "Create a zip file of each folder to the backup folder without making a normal backup.");
+        // Subscribe to the SelectedIndexChanged event to update the config.ini file
+        globalBackupOptionComboBox.SelectedIndexChanged += (s, e) =>
+        {
+            if (globalBackupOptionComboBox.SelectedIndex == 0)
+            {
+                ConfigurationManager.UpdateIniFile("onlyMakeZipBackup", "false");
+                ConfigurationManager.UpdateIniFile("includeZipInBackup", "false");
+                // Update status label
+                statusLabel.Text = "Global backup option set to 'Only make normal backup'.";
+                // Hide the global skip compare checkbox if the global backup option is set to 'Only make normal backup'
+                globalSkipCompareCheckBox.Visible = false;
+                // Hide the global max zip retention label and up-down if the global backup option is set to 'Only make normal backup'
+                globalMaxZipRetentionUpDownLabel.Visible = globalMaxZipRetentionUpDown.Visible = false;
+            }
+            else if (globalBackupOptionComboBox.SelectedIndex == 1)
+            {
+                ConfigurationManager.UpdateIniFile("onlyMakeZipBackup", "true");
+                ConfigurationManager.UpdateIniFile("includeZipInBackup", "false");
+                // Update status label
+                statusLabel.Text = "Global backup option set to 'Only make zip backup'.";
+                // Show the global skip compare checkbox if the global backup option is set to 'Only make zip backup'
+                globalSkipCompareCheckBox.Visible = true;
+                // Show the global max zip retention label and up-down if the global backup option is set to 'Only make zip backup'
+                globalMaxZipRetentionUpDownLabel.Visible = globalMaxZipRetentionUpDown.Visible = true;
+            }
+            else if (globalBackupOptionComboBox.SelectedIndex == 2)
+            {
+                ConfigurationManager.UpdateIniFile("onlyMakeZipBackup", "false");
+                ConfigurationManager.UpdateIniFile("includeZipInBackup", "true");
+                // Update status label
+                statusLabel.Text = "Global backup option set to 'Include zip in normal backup'.";
+                // Show the global skip compare checkbox if the global backup option is set to 'Include zip in normal backup'
+                globalSkipCompareCheckBox.Visible = true;
+                // Show the global max zip retention label and up-down if the global backup option is set to 'Include zip in normal backup'
+                globalMaxZipRetentionUpDownLabel.Visible = globalMaxZipRetentionUpDown.Visible = true;
+            }
+        };
 
         // Create the global skip compare checkbox
         globalSkipCompareCheckBox = new CheckBox
@@ -449,6 +504,8 @@ class SettingsForm : Form
             globalSkipCompareCheckBox.Checked = skipZipfileComparisonValue.ToLower() == "true";
         }
         LabelToolTip.SetToolTip(globalSkipCompareCheckBox, "Skip file comparison inside previous zip file when making zip backup.(Creates new zip file every time)");
+        // Hide the global skip compare checkbox if the global backup option is set to 'Only make normal backup'
+        globalSkipCompareCheckBox.Visible = globalBackupOptionComboBox.SelectedIndex != 0;
 
         // Create the global max zip retention label
         globalMaxZipRetentionUpDownLabel = new Label
@@ -458,7 +515,7 @@ class SettingsForm : Form
             Location = new Point(390, 410) // Adjust as needed
         };
         Controls.Add(globalMaxZipRetentionUpDownLabel);
-        LabelToolTip.SetToolTip(globalMaxZipRetentionUpDownLabel, "Maximum number of zip files to keep in the backup folder for all folders. Set to 0 for no limit.");
+        LabelToolTip.SetToolTip(globalMaxZipRetentionUpDownLabel, "Maximum number of zip files to keep in the backup location for each folder. Set to 0 for no limit.");
 
         globalMaxZipRetentionUpDown = new NumericUpDown
         {
@@ -480,6 +537,10 @@ class SettingsForm : Form
         {
             ConfigurationManager.UpdateIniFile("defaultMaxZipRetention", globalMaxZipRetentionUpDown.Value.ToString());
         };
+        // Set the tooltip for the global max zip retention up-down
+        LabelToolTip.SetToolTip(globalMaxZipRetentionUpDown, "Maximum number of zip files to keep in the backup folder for all folders. Set to 0 for no limit.");
+        // Hide the global max zip retention label and up-down if the global backup option is set to 'Only make normal backup'
+        globalMaxZipRetentionUpDownLabel.Visible = globalMaxZipRetentionUpDown.Visible = globalBackupOptionComboBox.SelectedIndex != 0;
 
         openConfigFileLinkLabel = new LinkLabel()
         {
@@ -529,11 +590,12 @@ class SettingsForm : Form
         // Set the status stript text to current status
         statusStripUpdate("Ready", true);
     }
+    #endregion
 
     private void foldersListBox_SelectedIndexChanged(object sender, EventArgs e)
     {
         var isSelected = foldersListBox.SelectedIndex != -1;
-        backupOptionComboBox.Visible = isSelected;
+        individualBackupOptionComboBox.Visible = isSelected;
         maxZipRetentionLabel.Visible = isSelected;
         maxZipRetentionUpDown.Visible = isSelected;
         skipCompareCheckBox.Visible = isSelected;
@@ -545,7 +607,7 @@ class SettingsForm : Form
         }
         else
         {
-            backupOptionComboBox.Visible = false;
+            individualBackupOptionComboBox.Visible = false;
             maxZipRetentionLabel.Visible = false;
             maxZipRetentionUpDown.Visible = false;
             skipCompareCheckBox.Visible = false;
@@ -555,8 +617,8 @@ class SettingsForm : Form
             skipCompareCheckBox.Enabled = false;
         }
         // maxZipRetentionUpDown and skipCompareCheckBox is enabled only if the selected backup option is not 'UseGlobalSetting'
-        maxZipRetentionUpDown.Enabled = isSelected && backupOptionComboBox.SelectedIndex != 0;
-        skipCompareCheckBox.Enabled = isSelected && backupOptionComboBox.SelectedIndex != 0;
+        maxZipRetentionUpDown.Enabled = isSelected && individualBackupOptionComboBox.SelectedIndex != 0;
+        skipCompareCheckBox.Enabled = isSelected && individualBackupOptionComboBox.SelectedIndex != 0;
     }
 
     private void LoadFolderSettingsUi(string folderPath)
@@ -567,7 +629,7 @@ class SettingsForm : Form
         if (folderConfigs.TryGetValue(folderPath, out var config))
         {
             // Set the UI elements to reflect the folder's individual settings
-            backupOptionComboBox.SelectedIndex = (int)config.BackupOption;
+            individualBackupOptionComboBox.SelectedIndex = (int)config.BackupOption;
             maxZipRetentionUpDown.Value = config.MaxZipRetention;
             skipCompareCheckBox.Checked = config.SkipCompare;
         }
@@ -575,7 +637,7 @@ class SettingsForm : Form
         {
             // No individual settings found, load global settings
             var globalConfig = ConfigurationManager.Config;
-            backupOptionComboBox.SelectedIndex = globalConfig.ContainsKey("defaultBackupOption")
+            individualBackupOptionComboBox.SelectedIndex = globalConfig.ContainsKey("defaultBackupOption")
                 ? int.Parse(globalConfig["defaultBackupOption"])
                 : 0; // Default to 'UseGlobalSetting' if not specified
             maxZipRetentionUpDown.Value = globalConfig.ContainsKey("defaultMaxZipRetention")
@@ -608,17 +670,17 @@ class SettingsForm : Form
         folderConfigs[folderPath] = new FolderConfig
         {
             FolderPath = folderPath,
-            BackupOption = (BackupOptions)backupOptionComboBox.SelectedIndex,
+            BackupOption = (BackupOptions)individualBackupOptionComboBox.SelectedIndex,
             MaxZipRetention = (int)maxZipRetentionUpDown.Value,
             SkipCompare = skipCompareCheckBox.Checked
         };
 
         // Enable or disable the maxZipRetentionUpDown and skipCompareCheckBox based on the selected backup option
-        maxZipRetentionUpDown.Enabled = backupOptionComboBox.SelectedIndex != 0;
-        skipCompareCheckBox.Enabled = backupOptionComboBox.SelectedIndex != 0;
+        maxZipRetentionUpDown.Enabled = individualBackupOptionComboBox.SelectedIndex != 0;
+        skipCompareCheckBox.Enabled = individualBackupOptionComboBox.SelectedIndex != 0;
 
         // If the selected backup option is 'UseGlobalSetting', set the maxZipRetention and skipCompareCheckBox value to the global setting
-        if (backupOptionComboBox.SelectedIndex == 0)
+        if (individualBackupOptionComboBox.SelectedIndex == 0)
         {
             maxZipRetentionUpDown.Value = globalMaxZipRetentionUpDown.Value;
             skipCompareCheckBox.Checked = globalSkipCompareCheckBox.Checked;
@@ -1021,22 +1083,6 @@ class SettingsForm : Form
         // Update status label
         string text = launchOnStartupCheckBox.Checked ? "Application will start on Windows startup." : "Application will not start on Windows startup.";
         UpdateStatusLabelSafe(text);
-    }
-
-    private void IncludeZipInBackupCheckBox_CheckedChanged(object sender, EventArgs e)
-    {
-        // Update config.ini with the new value
-        ConfigurationManager.UpdateIniFile("includeZipInBackup", includeZipInBackupCheckBox.Checked ? "true" : "false");
-        // Update status label
-        statusLabel.Text = includeZipInBackupCheckBox.Checked ? "Zip files will be included in the backup." : "Zip files will not be included in the backup.";
-    }
-
-    private void OnlyMakeZipBackupCheckBox_CheckedChanged(object sender, EventArgs e)
-    {
-        // Update config.ini with the new value
-        ConfigurationManager.UpdateIniFile("onlyMakeZipBackup", onlyMakeZipBackupCheckBox.Checked ? "true" : "false");
-        // Update status label
-        statusLabel.Text = onlyMakeZipBackupCheckBox.Checked ? "Only zip backups will be created." : "Normal backups will be created.";
     }
 
     private void GlobalSkipCompareCheckBox_CheckedChanged(object sender, EventArgs e)
