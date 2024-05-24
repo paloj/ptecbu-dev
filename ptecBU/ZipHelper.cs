@@ -456,8 +456,14 @@ public class FolderArchiver
                 Debug.WriteLine($"Folder not found: {folder}");
                 continue;
             }
+            // Handle drive root
+            string folderName = Path.GetFileName(folders[i]);
+            if (string.IsNullOrEmpty(folderName))
+            {
+                folderName = folders[i].TrimEnd('\\').Replace(':', '_') + "drive";
+            }
 
-            string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {Path.GetFileName(folder)}";
+            string baseFileName = $"{DateTime.Now:yyyy-MM-dd} {folderName}";
             int version = 1;
             string searchPattern = $"{baseFileName} V*.zip";
             string[] existingArchives = Directory.GetFiles(destinationPath, searchPattern);
@@ -483,7 +489,7 @@ public class FolderArchiver
             // Delete old zip files of the selected folder if max zip retention is set
             if (maxZipRetention > 0)
             {
-                DeleteOldZipFiles(destinationPath, Path.GetFileName(folder), maxZipRetention);
+                DeleteOldZipFiles(destinationPath, folder, maxZipRetention);
             }
 
             Debug.WriteLine($"Completed archiving: {folder}");
@@ -520,6 +526,12 @@ public class FolderArchiver
                         // Ensure the relative path is calculated correctly
                         string relativePath = Path.GetRelativePath(folder, file.FilePath);
                         string entryName = Path.Combine(Path.GetFileName(folder), relativePath);
+
+                        // Adjust for root directory names
+                        if (Path.GetPathRoot(folder).Equals(folder, StringComparison.OrdinalIgnoreCase))
+                        {
+                            entryName = Path.Combine(new DirectoryInfo(folder).Name.TrimEnd('\\').Replace(':', '_') + "drive", relativePath);
+                        }
 
                         // Decide the compression level based on file size
                         CompressionLevel level;
@@ -638,6 +650,7 @@ public class FolderArchiver
                 foreach (var fileInfo in files)
                 {
                     string relativePath = GetRelativePath(fileInfo.FilePath, folderPath).Replace('\\', '/').TrimStart('/');
+                    Debug.WriteLine($"Relative path parsed for filepath: {fileInfo.FilePath} Relative: {relativePath}");
 
                     // Check if the file exists in the archive and compare times if it does
                     if (!zipEntries.ContainsKey(relativePath))
@@ -668,6 +681,12 @@ public class FolderArchiver
         // Extract just the folder name from the full path
         string folderName = new DirectoryInfo(folderPath).Name;
 
+        bool isDriveRoot = Path.GetPathRoot(folderPath).Equals(folderPath, StringComparison.OrdinalIgnoreCase);
+        if (isDriveRoot)
+        {
+            folderName = folderPath.TrimEnd('\\').Replace(':', '_') + "drive";
+        }
+
         // Construct the search pattern to match zip files for the folder
         string searchPattern = $"*{folderName} V*.zip";
 
@@ -695,9 +714,21 @@ public class FolderArchiver
     }
 
     // Delete old zip files based on max zip retention. Starting from the oldest file, keep the most recent maxZipRetention files. The files are prefixed with timestamp $"{DateTime.Now:yyyy-MM-dd}
-    private void DeleteOldZipFiles(string destinationPath, string folder, int maxZipRetention)
+    private void DeleteOldZipFiles(string destinationPath, string folderPath, int maxZipRetention)
     {
+        // Extract just the folder name from the full path
+        string folder = Path.GetFileName(folderPath);
+
+        // Check if the folder is a drive root
+        bool isDriveRoot = Path.GetPathRoot(folderPath).Equals(folderPath, StringComparison.OrdinalIgnoreCase);
+        if (isDriveRoot)
+        {
+            folder = folderPath.TrimEnd('\\').Replace(':', '_') + "drive";
+        }
+
+        // Construct the search pattern to match zip files for the folder
         string searchPattern = $"*{folder} V*.zip";
+        // Use destinationPath which points to the backup destination for zip files
         string[] existingArchives = Directory.GetFiles(destinationPath, searchPattern);
 
         if (existingArchives.Length <= maxZipRetention)
@@ -725,15 +756,16 @@ public class FolderArchiver
 
     private string GetRelativePath(string filePath, string folderPath)
     {
-        // Assuming folderPath is the full path to the "TC_Settings" folder,
-        // and filePath is the full path to a file within that folder.
-        string relativePath = filePath.Substring(folderPath.Length + 1).Replace('\\', '/');
-
-        // Prepend the folder name to match the archive entry format.
-        // You might need to adjust this part if folderPath or filePath doesn't directly include the folder name.
+        string relativePath = filePath.Substring(folderPath.Length).Replace('\\', '/').TrimStart('/');
         string folderName = new DirectoryInfo(folderPath).Name;
-        relativePath = $"{folderName}/{relativePath}"; // Now matches format "TC_Settings/Settings 2020-06-24.vssettings"
 
+        // Handle the case for drive roots
+        if (Path.GetPathRoot(folderPath).Equals(folderPath, StringComparison.OrdinalIgnoreCase))
+        {
+            folderName = folderPath.TrimEnd('\\').Replace(':', '_') + "drive";
+        }
+
+        relativePath = $"{folderName}/{relativePath}"; // Now matches format "E_drive/Documents and Settings/system.hv"
         return relativePath;
     }
 
