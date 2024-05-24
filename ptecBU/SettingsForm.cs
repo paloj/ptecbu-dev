@@ -57,8 +57,6 @@ class SettingsForm : Form
     private NumericUpDown maxZipRetentionUpDown;
     private CheckBox skipCompareCheckBox;
 
-
-
     private int previousIndex = -1; // To track the item index that the tooltip was last shown for
 
     #endregion

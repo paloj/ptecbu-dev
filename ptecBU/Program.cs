@@ -1,5 +1,6 @@
 // Build command
 // dotnet publish -c Release -r win-x64 --self-contained false
+using Accessibility;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Globalization;
@@ -16,11 +17,38 @@ static class Program
     public static bool FolderListNotEmpty = false;
     public static Process RobocopyProcess;
     public static int BackupTimerInterval = 60000; // 1 minute
-
+    private static Mutex mutex = null;
+    private static EventWaitHandle eventWaitHandle = null;
 
     [STAThread]
     static async Task Main(string[] args)
     {
+        //Variable to tell the backupmanager if program is started with arguments. then no trayicon actions or mutex check is needed
+        IsRunningWithArguments = args.Length > 0;
+
+        if (!IsRunningWithArguments) // If the program is running normally create a mutex and eventwaithandle
+        {
+            // Check if the application is already running
+            const string mutexName = "PtecBUSingleInstanceApp";
+            const string eventWaitHandleName = "PtecBUSingleInstanceAppSignal";
+
+            bool createdNew;
+            mutex = new Mutex(true, mutexName, out createdNew);
+            eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset, eventWaitHandleName);
+
+            if (!createdNew)
+            {
+                // Signal the existing instance to bring up the SettingsForm
+                Debug.WriteLine("Signaling existing instance to bring up the SettingsForm");
+                eventWaitHandle.Set();
+                // The application is already running
+                return;
+            }
+
+            // Task to wait for signals to show SettingsForm
+            _ = Task.Run(() => WaitForSignal());
+        }
+
         SystemEvents.SessionSwitch += new SessionSwitchEventHandler(SystemEvents_SessionSwitch);
         Application.ApplicationExit += new EventHandler(Application_ApplicationExit);
 
@@ -48,9 +76,6 @@ static class Program
         ConfigurationManager.LoadConfig("config.ini");
         // Update the configuration with command line arguments
         ProcessCommandLineArguments(args);
-
-        //Variable to tell the backupmanager if program is started with arguments. then no trayicon actions
-        IsRunningWithArguments = args.Length > 0;
 
         string value; // Variable to store the value of the configuration key
 
@@ -160,6 +185,16 @@ static class Program
             var context = new CustomApplicationContext(trayIcon);
             // Run the application with the custom context
             Application.Run(context);
+        }
+    }
+
+    private static void WaitForSignal()
+    {
+        while (true)
+        {
+            eventWaitHandle.WaitOne();
+            // Show the SettingsForm when signal is received
+            ShowSettingsForm();
         }
     }
 
