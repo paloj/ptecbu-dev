@@ -314,7 +314,7 @@ static class Program
                 try
                 {
                     // Perform backup using the ConfigurationManager destination
-                    await BackupManager.PerformBackup(false,updateUI);
+                    await BackupManager.PerformBackup(false, updateUI);
                 }
                 catch (Exception ex)
                 {
@@ -374,6 +374,9 @@ static class Program
 
         IsBackupInProgress = false;
 
+        // Call function to run attrib.exe to remove the hidden attribute from all of the destination folders
+        RemoveHiddenAttributeFromDestinationFolders();
+
         // Reset backup status and update tray menu as necessary
         try
         {
@@ -389,6 +392,42 @@ static class Program
         // Restart the application to ensure proper cleanup
         Application.Restart();
     }
+
+    // Define RemoveHiddenAttributeFromDestinationFolders() function
+    private static void RemoveHiddenAttributeFromDestinationFolders()
+    {
+        // Get the destination path from the configuration
+        string destination = Path.Combine(ConfigurationManager.Config["destination"], Environment.MachineName);
+
+        // Check if the destination path is a valid directory
+        if (Directory.Exists(destination))
+        {
+            // Get all directories in the destination path
+            string[] directories = Directory.GetDirectories(destination);
+
+            // Loop through each directory
+            foreach (string directory in directories)
+            {
+                try
+                {
+                    // Get the attributes of the directory
+                    FileAttributes attributes = File.GetAttributes(directory);
+
+                    // Remove the hidden attribute from the directory
+                    if ((attributes & FileAttributes.Hidden) == FileAttributes.Hidden)
+                    {
+                        File.SetAttributes(directory, attributes & ~FileAttributes.Hidden);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log the exception or handle it as needed
+                    Console.WriteLine($"Failed to remove hidden attribute from {directory}: {ex.Message}");
+                }
+            }
+        }
+    }
+
 
     public static void UpdateTrayMenuItem()
     {
@@ -530,42 +569,52 @@ static class Program
             // Check if the lines are missing and add them
             if (!lines.Any(line => line.StartsWith("destination=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n// Destination is the location of the backup.\n");
                 File.AppendAllText(configPath, "destination=\\192.168.11.110\backup\n");
             };
             if (!lines.Any(line => line.StartsWith("autobackup=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n// autobackup enables or disables the automatic backup.\n");
                 File.AppendAllText(configPath, "autobackup=1\n");
             };
             if (!lines.Any(line => line.StartsWith("hoursbetweenbackups=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//hoursbetweenbackups is the number of hours between backups.\n");
                 File.AppendAllText(configPath, "hoursbetweenbackups=24\n");
             };
             if (!lines.Any(line => line.StartsWith("robocopymt=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//robocopymt is the number of threads to use for robocopy.\n");
                 File.AppendAllText(configPath, "robocopymt=16\n");
             };
             if (!lines.Any(line => line.StartsWith("twobackups=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//twobackups enables or disables the two backup system. two first weeks of the moth will have suffix _1 and the last two weeks will have suffix _2.\n");
                 File.AppendAllText(configPath, "twobackups=false\n");
             };
             if (!lines.Any(line => line.StartsWith("includeZipInBackup=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//includeZipInBackup enables or disables the zipping of the backup.\n");
                 File.AppendAllText(configPath, "includeZipInBackup=false\n");
             };
             if (!lines.Any(line => line.StartsWith("onlyMakeZipBackup=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//onlyMakeZipBackup=true sets the automatic backup to only make zip files of the selected folders and skip the incremental robocopy backup.\n");
                 File.AppendAllText(configPath, "onlyMakeZipBackup=false\n");
             };
             if (!lines.Any(line => line.StartsWith("skipZipfileComparison=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//skipZipfileComparison=true skips the comparison of the zip files and just makes a new zip file every time.\n");
                 File.AppendAllText(configPath, "skipZipfileComparison=false\n");
             };
             if (!lines.Any(line => line.StartsWith("defaultMaxZipRetention=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//defaultMaxZipRetention is the max number of zip files to keep for each folder. 0 means keep all.\n");
                 File.AppendAllText(configPath, "defaultMaxZipRetention=10\n");
             };
             if (!lines.Any(line => line.StartsWith("systemimagedestination=", StringComparison.OrdinalIgnoreCase)))
             {
+                File.AppendAllText(configPath, "\n//systemimagedestination is the location of the system image backup.\n");
                 File.AppendAllText(configPath, "systemimagedestination=\n");
             };
 

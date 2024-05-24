@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "ptecBU"
-#define MyAppVersion "1.0.0.25"
+#define MyAppVersion "1.0.0.26"
 #define MyAppPublisher "Priatec Oy"
 #define MyAppURL "http://www.priatec.fi/ptecbu"
 #define MyAppExeName "ptecBU.exe"

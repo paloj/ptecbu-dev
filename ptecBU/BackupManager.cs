@@ -262,7 +262,13 @@ public class BackupManager
                 string folderNameForDestination;
                 if (isDriveRoot)
                 {
+                    Debug.WriteLine($"Drive root {folder} detected.");
+                    
+                    // Use the drive letter and append a suffix
                     folderNameForDestination = $"{folder.Replace(":", "")}_drive";
+
+                    // Add backslash to source folder if it's a drive root
+                    folder += "\\";
                 }
                 else
                 {
@@ -277,15 +283,21 @@ public class BackupManager
                 // Validate the folderDestination path
                 if (PathValidator.IsValidPath(folderDestination))
                 {
-                    // Remove trailing backslash from source and destination
-                    folder = folder.TrimEnd('\\');
+                    // Remove trailing backslash from source (if not drive root) and destination
+                    if (!isDriveRoot)
+                    {
+                        folder = folder.TrimEnd('\\');
+                    }
                     folderDestination = folderDestination.TrimEnd('\\');
 
                     // Read robocopymt value from config dictionary
                     string mtValue = globalConfig.GetValueOrDefault("robocopymt", "16");
 
                     // Build robocopy command
-                    string robocopyArgs = $"\"{folder}\" \"{folderDestination} \" /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:log/backup_{i + 1}.log {excludeParams} /A-:SH";
+                    string sourcePath = isDriveRoot ? folder : $"\"{folder}\"";
+                    string destinationPath = $"\"{folderDestination}\"";
+                    string robocopyArgs = $"{sourcePath} {destinationPath} /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:log/backup_{i + 1}.log {excludeParams} /A-:SH";
+                    
                     File.WriteAllText("log/robocopyArgs.log", robocopyArgs.ToString());
 
                     // Before starting a new robocopy process, ensure any existing one is properly handled
@@ -314,6 +326,8 @@ public class BackupManager
                     }
 
                     // Run robocopy
+                    Debug.WriteLine($"Running robocopy for {folder} to {folderDestination}");
+                    Debug.WriteLine($"Robocopy arguments: {robocopyArgs}");
                     ProcessStartInfo psiRobocopy = new ProcessStartInfo("robocopy.exe", robocopyArgs);
                     psiRobocopy.CreateNoWindow = true;
                     psiRobocopy.UseShellExecute = false;
