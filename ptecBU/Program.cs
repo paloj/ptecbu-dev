@@ -19,6 +19,8 @@ static class Program
     public static int BackupTimerInterval = 60000; // 1 minute
     private static Mutex mutex = null;
     private static EventWaitHandle eventWaitHandle = null;
+    public static bool IsSettingsFormOpen = false;
+    private static Form settingsFormInstance = null;
 
     [STAThread]
     static async Task Main(string[] args)
@@ -200,10 +202,25 @@ static class Program
 
     private static void ShowSettingsForm()
     {
+        // Check if the SettingsForm is already open
+        if (IsSettingsFormOpen)
+        {
+            // Bring the form to the front
+            settingsFormInstance.Invoke(new Action(() =>
+            {
+                settingsFormInstance.WindowState = FormWindowState.Normal;
+                settingsFormInstance.BringToFront();
+                settingsFormInstance.Activate();
+            }));
+            return;
+        }
+
         Thread thread = new Thread(() =>
         {
-            var settingsForm = new SettingsForm();
-            settingsForm.ShowDialog();
+            settingsFormInstance = new SettingsForm();
+            IsSettingsFormOpen = true;
+            settingsFormInstance.FormClosed += (sender, args) => IsSettingsFormOpen = false;
+            settingsFormInstance.ShowDialog();
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

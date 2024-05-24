@@ -896,6 +896,8 @@ class SettingsForm : Form
     private void OnClose(object sender, EventArgs e)
     {
         // Handle Close clicked
+        Program.IsSettingsFormOpen = false;
+        // Handle Close clicked
         UpdateRegistryForStartup();
 
         // Hide the form
@@ -1128,6 +1130,8 @@ class SettingsForm : Form
 
     private void FormClosing_Event(object sender, FormClosingEventArgs e)
     {
+        // Handle the form closing event
+        Program.IsSettingsFormOpen = false;
         // Unsubscribe to prevent memory leaks
         BackupManager.StatusUpdated -= UpdateStatusLabelSafe;
     }
