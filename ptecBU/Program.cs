@@ -474,7 +474,7 @@ static class Program
                 catch (Exception ex)
                 {
                     // Log the exception or handle it as needed
-                    Console.WriteLine($"Failed to remove hidden attribute from {directory}: {ex.Message}");
+                    Debug.WriteLine($"Failed to remove hidden attribute from {directory}: {ex.Message}");
                 }
             }
         }

@@ -263,7 +263,7 @@ public class BackupManager
                 if (isDriveRoot)
                 {
                     Debug.WriteLine($"Drive root {folder} detected.");
-                    
+
                     // Use the drive letter and append a suffix
                     folderNameForDestination = $"{folder.Replace(":", "")}_drive";
 
@@ -297,7 +297,7 @@ public class BackupManager
                     string sourcePath = isDriveRoot ? folder : $"\"{folder}\"";
                     string destinationPath = $"\"{folderDestination}\"";
                     string robocopyArgs = $"{sourcePath} {destinationPath} /E /R:1 /W:1 /MT:{mtValue} /Z /LOG:log/backup_{i + 1}.log {excludeParams} /A-:SH";
-                    
+
                     File.WriteAllText("log/robocopyArgs.log", robocopyArgs.ToString());
 
                     // Before starting a new robocopy process, ensure any existing one is properly handled
@@ -392,20 +392,19 @@ public class BackupManager
                     {
                         try
                         {
-                            // Command to remove hidden and system attributes
-                            string attribArgs = $"-s -h \"{folderDestination}\"";
-                            ProcessStartInfo psiAttrib = new ProcessStartInfo("attrib.exe", attribArgs)
+                            // Get the attributes of the directory
+                            FileAttributes attributes = File.GetAttributes(folderDestination);
+
+                            // Remove the hidden attribute from the directory
+                            if ((attributes & FileAttributes.Hidden) == FileAttributes.Hidden)
                             {
-                                CreateNoWindow = true,
-                                UseShellExecute = false
-                            };
-                            Process pAttrib = Process.Start(psiAttrib);
-                            pAttrib.WaitForExit();
+                                File.SetAttributes(folderDestination, attributes & ~FileAttributes.Hidden);
+                            }
                         }
                         catch (Exception ex)
                         {
-                            // Write current timestamp and error to file
-                            File.WriteAllText("log/attribFail.log", $"{DateTime.Now.ToString("o")}\nExit code: {ex}");
+                            // Log the exception or handle it as needed
+                            Debug.WriteLine($"Failed to remove hidden attribute from {folderDestination}: {ex.Message}");
                         }
 
                         // Write current timestamp to file
